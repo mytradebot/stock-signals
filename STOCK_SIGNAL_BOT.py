@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 """
 MANGOBOT - ELITE VERSION
-Analyzes 3000+ stocks, recommends TOP 1 BEST stock every 30 min
-Best stock for 7-day hold period
-Professional quality signals only
+Analyzes every 5 min, pushes best stock every 30 min
 """
 
 import requests
@@ -14,7 +12,6 @@ import os
 
 class EliteMangoBot:
     def __init__(self):
-        # Discord config
         self.discord_webhook = os.environ.get('DISCORD_WEBHOOK')
         
         if not self.discord_webhook:
@@ -36,12 +33,17 @@ class EliteMangoBot:
         self.state_file = "stock_bot_state.json"
         self.positions_file = "active_positions.json"
         self.daily_signals_file = "daily_signals.json"
+        self.buffer_file = "signal_buffer.json"
+        
+        # Signal buffer (accumulates for 30 min)
+        self.signal_buffer = []
+        self.last_discord_push = datetime.now()
         
         self.load_state()
         
         self.log("=" * 80)
         self.log("🥭 MANGOBOT - ELITE VERSION")
-        self.log("🎯 Top 1 Best Stock Every 30 Minutes")
+        self.log("✅ Check every 5 min | Push best stock every 30 min")
         self.log(f"📊 Analyzing {len(self.top_stocks)} USA Stocks")
         self.log("=" * 80)
     
@@ -151,6 +153,15 @@ class EliteMangoBot:
             self.active_positions = {}
         
         try:
+            if os.path.exists(self.buffer_file):
+                with open(self.buffer_file) as f:
+                    self.signal_buffer = json.load(f)
+            else:
+                self.signal_buffer = []
+        except:
+            self.signal_buffer = []
+        
+        try:
             if os.path.exists(self.daily_signals_file):
                 with open(self.daily_signals_file) as f:
                     self.daily_signals = json.load(f)
@@ -175,6 +186,13 @@ class EliteMangoBot:
         try:
             with open(self.positions_file, 'w') as f:
                 json.dump(self.active_positions, f, indent=2)
+        except:
+            pass
+    
+    def save_buffer(self):
+        try:
+            with open(self.buffer_file, 'w') as f:
+                json.dump(self.signal_buffer, f, indent=2)
         except:
             pass
     
@@ -221,13 +239,13 @@ class EliteMangoBot:
         
         return None
     
-    def find_best_signal(self):
-        """Find THE BEST stock (highest dip %)"""
-        best_signal = None
+    def find_all_signals(self):
+        """Find ALL signals and ADD to buffer"""
+        signals = []
         analyzed = 0
         found = 0
         
-        self.log(f"🔍 Scanning {len(self.top_stocks)} stocks for BEST opportunity...")
+        self.log(f"🔍 Scanning {len(self.top_stocks)} stocks...")
         
         for symbol in self.top_stocks:
             try:
@@ -244,22 +262,22 @@ class EliteMangoBot:
                 if dip >= self.min_dip and volume >= self.min_volume:
                     found += 1
                     
-                    # Check if this is better than current best
-                    if best_signal is None or dip > best_signal['dip']:
-                        entry = price
-                        target = price * (1 + self.profit_target / 100)
-                        stop = price * (1 - self.stop_loss / 100)
-                        
-                        best_signal = {
-                            'symbol': symbol,
-                            'price': round(price, 2),
-                            'dip': round(dip, 2),
-                            'volume': volume,
-                            'entry': round(entry, 2),
-                            'target': round(target, 2),
-                            'stop': round(stop, 2),
-                            'timestamp': datetime.now().isoformat()
-                        }
+                    entry = price
+                    target = price * (1 + self.profit_target / 100)
+                    stop = price * (1 - self.stop_loss / 100)
+                    
+                    signal = {
+                        'symbol': symbol,
+                        'price': round(price, 2),
+                        'dip': round(dip, 2),
+                        'volume': volume,
+                        'entry': round(entry, 2),
+                        'target': round(target, 2),
+                        'stop': round(stop, 2),
+                        'timestamp': datetime.now().isoformat()
+                    }
+                    
+                    signals.append(signal)
                 
                 time.sleep(0.02)
             
@@ -267,36 +285,33 @@ class EliteMangoBot:
                 continue
         
         self.log(f"   ✅ Analyzed: {analyzed}/{len(self.top_stocks)}")
-        self.log(f"   📊 Found: {found} qualified stocks")
+        self.log(f"   📊 Found: {found} signals this cycle")
         
-        if best_signal:
-            self.log(f"   🏆 BEST: {best_signal['symbol']} (Dip: {best_signal['dip']}%)")
-        
-        return best_signal
+        # Add to buffer
+        if signals:
+            self.signal_buffer.extend(signals)
+            self.save_buffer()
+            self.log(f"   💾 Buffer total: {len(self.signal_buffer)} signals")
     
-    def send_discord_message(self, message):
-        """Send to Discord"""
-        try:
-            payload = {'content': message}
-            response = requests.post(self.discord_webhook, json=payload, timeout=10)
-            return response.status_code == 204
-        except Exception as e:
-            self.log(f"❌ Discord error: {e}")
+    def push_best_signal_to_discord(self):
+        """Find THE BEST from buffer and push to Discord"""
+        if not self.signal_buffer:
+            self.log("⚪ No signals in buffer")
             return False
-    
-    def send_elite_signal(self, signal):
-        """Send THE BEST stock recommendation"""
-        symbol = signal['symbol']
-        price = signal['price']
-        dip = signal['dip']
-        target = signal['target']
-        stop = signal['stop']
-        current_time = datetime.now().strftime("%H:%M %Z")
+        
+        # Find THE BEST (highest dip %)
+        best_signal = max(self.signal_buffer, key=lambda x: x['dip'])
+        
+        symbol = best_signal['symbol']
+        price = best_signal['price']
+        dip = best_signal['dip']
+        target = best_signal['target']
+        stop = best_signal['stop']
         
         message = f"""🥭 **MANGOBOT ELITE SIGNAL**
-⏰ {current_time}
+⏰ {datetime.now().strftime("%H:%M %Z")}
 
-🏆 **TODAY'S TOP PICK:**
+🏆 **TOP PICK (from {len(self.signal_buffer)} analyzed):**
 `{symbol}`
 
 📈 **Entry Price:** `${price:.2f}`
@@ -306,41 +321,54 @@ class EliteMangoBot:
 ⏱️ **Hold Period:** Up to {self.max_hold_days} days
 
 **Why This Stock?**
-✅ Highest dip among 3000+ stocks analyzed
+✅ BEST dip among ALL signals found
+✅ Analyzed every 5 min for 30 min window
 ✅ Strong volume confirmed
-✅ Best risk-reward ratio
-✅ Perfect for 7-day swing trade
+✅ Perfect 7-day swing trade setup
 
 **Action:** BUY NOW on your exchange! 📲
 
-🚀 Next signal in 30 minutes
-💪 MangoBot Elite - Only Best Stocks! 🥭"""
+🔄 Next signal in 30 minutes
+💪 MangoBot Elite! 🥭"""
         
-        if self.send_discord_message(message):
-            entry_time = datetime.now().isoformat()
-            self.active_positions[symbol] = {
-                'entry_price': price,
-                'entry_time': entry_time,
-                'target': target,
-                'stop': stop,
-                'status': 'OPEN'
-            }
-            self.save_positions()
+        try:
+            payload = {'content': message}
+            response = requests.post(self.discord_webhook, json=payload, timeout=10)
             
-            # Save to daily signals
-            self.daily_signals.append({
-                'symbol': symbol,
-                'price': price,
-                'dip': dip,
-                'timestamp': entry_time
-            })
-            self.save_daily_signals()
-            
-            self.signals_today += 1
-            self.save_state()
-            
-            self.log(f"📱 Elite signal sent: {symbol}")
-            return True
+            if response.status_code == 204:
+                # Save position
+                entry_time = datetime.now().isoformat()
+                self.active_positions[symbol] = {
+                    'entry_price': price,
+                    'entry_time': entry_time,
+                    'target': target,
+                    'stop': stop,
+                    'status': 'OPEN'
+                }
+                self.save_positions()
+                
+                # Save to daily signals
+                self.daily_signals.append({
+                    'symbol': symbol,
+                    'price': price,
+                    'dip': dip,
+                    'timestamp': entry_time
+                })
+                self.save_daily_signals()
+                
+                self.signals_today += 1
+                self.save_state()
+                
+                self.log(f"📱 BEST signal pushed: {symbol} (Dip: {dip}%)")
+                
+                # Clear buffer
+                self.signal_buffer = []
+                self.save_buffer()
+                
+                return True
+        
+        except Exception as e:
+            self.log(f"❌ Discord error: {e}")
         
         return False
     
@@ -356,11 +384,13 @@ P/L: `{profit_pct:+.2f}%`
 
 📲 Sell on your exchange NOW!"""
         
-        if self.send_discord_message(message):
+        try:
+            payload = {'content': message}
+            requests.post(self.discord_webhook, json=payload, timeout=10)
             self.log(f"📱 Sell signal: {symbol} ({reason})")
             return True
-        
-        return False
+        except:
+            return False
     
     def check_sell_conditions(self):
         """Check open positions"""
@@ -407,21 +437,6 @@ P/L: `{profit_pct:+.2f}%`
         if positions_to_remove:
             self.save_positions()
     
-    def send_status_message(self):
-        """Send status"""
-        active_count = len([p for p in self.active_positions.values() if p['status'] == 'OPEN'])
-        
-        message = f"""📊 **STATUS UPDATE**
-⏰ {datetime.now().strftime("%H:%M %Z")}
-
-🎯 Active Positions: `{active_count}`
-📈 Today's Signals: `{self.signals_today}`
-🔄 Next Signal: In 30 minutes
-
-🥭 MangoBot Elite is watching! Stay ready!"""
-        
-        self.send_discord_message(message)
-    
     def is_market_hours(self):
         """Check US market hours"""
         from datetime import datetime, timezone
@@ -435,7 +450,7 @@ P/L: `{profit_pct:+.2f}%`
         return is_weekday and is_market_hours
     
     def run_cycle(self):
-        """Run every 30 minutes"""
+        """Run every 5 minutes"""
         self.log("-" * 80)
         
         today = datetime.now().strftime("%Y-%m-%d")
@@ -443,31 +458,36 @@ P/L: `{profit_pct:+.2f}%`
             self.signals_today = 0
             self.last_signal_date = today
             self.daily_signals = []
+            self.signal_buffer = []
         
-        # Check sell conditions first
+        # Check sell conditions
         self.log("🔍 Checking open positions...")
         self.check_sell_conditions()
         
-        # Find THE BEST stock
-        best_signal = self.find_best_signal()
+        # Find ALL signals and add to buffer
+        self.log("📊 Scanning for signals...")
+        self.find_all_signals()
         
-        if best_signal:
-            self.log(f"🏆 Found best stock: {best_signal['symbol']}")
-            self.send_elite_signal(best_signal)
+        # Check if 30 minutes have passed
+        time_since_push = datetime.now() - self.last_discord_push
+        
+        if time_since_push >= timedelta(minutes=30):
+            self.log(f"⏰ 30 minutes elapsed - Pushing BEST signal!")
+            self.push_best_signal_to_discord()
+            self.last_discord_push = datetime.now()
         else:
-            self.log("⚪ No qualified stocks found this cycle")
-            self.send_status_message()
+            remaining = 30 - int(time_since_push.total_seconds() / 60)
+            self.log(f"⏳ Next push in {remaining} minutes (Buffer: {len(self.signal_buffer)})")
     
     def start(self):
         """Start bot"""
         self.log(f"🚀 **MANGOBOT ELITE CONFIG**")
         self.log(f"   📊 Stocks: {len(self.top_stocks)}")
-        self.log(f"   ⏰ Signal: Every 30 minutes (market hours)")
-        self.log(f"   🏆 Quality: Top 1 BEST stock only")
+        self.log(f"   ⏰ Scan: Every 5 minutes")
+        self.log(f"   📱 Discord: Every 30 minutes (BEST only)")
         self.log(f"   🔥 Min Dip: {self.min_dip}%")
         self.log(f"   💰 Profit Target: +{self.profit_target}%")
         self.log(f"   🛑 Stop Loss: -{self.stop_loss}%")
-        self.log(f"   ⏱️ Hold Period: {self.max_hold_days} days")
         self.log("=" * 80)
         
         cycle = 0
@@ -483,8 +503,8 @@ P/L: `{profit_pct:+.2f}%`
                 else:
                     self.log("⏳ Market closed (9:30 AM - 4:00 PM EDT)")
                 
-                self.log(f"⏱️  Next check in 30 min...")
-                time.sleep(1800)  # 30 minutes
+                self.log(f"⏱️  Next check in 5 min...")
+                time.sleep(300)  # 5 minutes
         
         except KeyboardInterrupt:
             self.log("\n⏹️  BOT STOPPED")
