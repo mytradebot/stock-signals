@@ -30,9 +30,9 @@ class StockSignalBot:
         # Strategy parameters
         self.min_dip = 1.5
         self.min_volume = 1000000
-        self.profit_target = 5.0  # +5% to sell
-        self.stop_loss = 2.0  # -2% to sell
-        self.max_hold_days = 7  # 7 days to sell
+        self.profit_target = 5.0
+        self.stop_loss = 2.0
+        self.max_hold_days = 7
         self.max_signals_per_day = 6
         
         # State files
@@ -172,7 +172,7 @@ class StockSignalBot:
                         'stop': stop
                     })
                     
-                    self.log(f"   ✅ {symbol}: ${price:.2f} | Dip: {dip:.2f}%")
+                    self.log(f" ✅ {symbol}: ${price:.2f} | Dip: {dip:.2f}%")
                 
                 time.sleep(0.1)
             
@@ -216,7 +216,6 @@ class StockSignalBot:
 Buy now on your exchange! 📲"""
         
         if self.send_discord_signal(message):
-            # Add to active positions
             entry_time = datetime.now().isoformat()
             self.active_positions[symbol] = {
                 'entry_price': price,
@@ -260,7 +259,6 @@ Buy now on your exchange! 📲"""
                 if pos['status'] != 'OPEN':
                     continue
                 
-                # Get current price
                 data = self.get_stock_data(symbol)
                 if not data:
                     continue
@@ -270,22 +268,18 @@ Buy now on your exchange! 📲"""
                 target = pos['target']
                 stop = pos['stop']
                 
-                # Calculate change
                 profit_pct = ((current_price - entry_price) / entry_price) * 100
                 
-                # Check profit target
                 if current_price >= target:
                     self.send_sell_signal(symbol, f"PROFIT TARGET +{self.profit_target}%", current_price, entry_price, profit_pct)
                     positions_to_remove.append(symbol)
                     continue
                 
-                # Check stop loss
                 if current_price <= stop:
                     self.send_sell_signal(symbol, f"STOP LOSS -{self.stop_loss}%", current_price, entry_price, profit_pct)
                     positions_to_remove.append(symbol)
                     continue
                 
-                # Check time limit
                 entry_time = datetime.fromisoformat(pos['entry_time'])
                 days_held = (datetime.now() - entry_time).days
                 
@@ -298,7 +292,6 @@ Buy now on your exchange! 📲"""
                 self.log(f"❌ Error checking {symbol}: {e}")
                 continue
         
-        # Remove closed positions
         for symbol in positions_to_remove:
             self.active_positions[symbol]['status'] = 'CLOSED'
         
@@ -309,7 +302,7 @@ Buy now on your exchange! 📲"""
         """Check if market is open (US Eastern time)"""
         from datetime import datetime, timezone
         
-        eastern = timezone(timedelta(hours=-5))
+        eastern = timezone(timedelta(hours=-4)) # EDT (daylight saving)
         now = datetime.now(eastern)
         
         is_weekday = now.weekday() < 5
@@ -321,17 +314,14 @@ Buy now on your exchange! 📲"""
         """Run one analysis cycle"""
         self.log("-" * 80)
         
-        # Check if today is new day
         today = datetime.now().strftime("%Y-%m-%d")
         if today != self.last_signal_date:
             self.signals_today = 0
             self.last_signal_date = today
         
-        # Check sell conditions first
         self.log("🔍 Checking open positions for sell signals...")
         self.check_sell_conditions()
         
-        # Find new buy signals
         signals = self.find_signals()
         
         if not signals:
@@ -350,12 +340,12 @@ Buy now on your exchange! 📲"""
     def start(self):
         """Start bot"""
         self.log(f"🚀 CONFIGURATION")
-        self.log(f"   Stocks: {len(self.top_stocks)}")
-        self.log(f"   Min Dip: {self.min_dip}%")
-        self.log(f"   Profit Target: +{self.profit_target}%")
-        self.log(f"   Stop Loss: -{self.stop_loss}%")
-        self.log(f"   Max Hold: {self.max_hold_days} days")
-        self.log(f"   Max Signals/Day: {self.max_signals_per_day}")
+        self.log(f" Stocks: {len(self.top_stocks)}")
+        self.log(f" Min Dip: {self.min_dip}%")
+        self.log(f" Profit Target: +{self.profit_target}%")
+        self.log(f" Stop Loss: -{self.stop_loss}%")
+        self.log(f" Max Hold: {self.max_hold_days} days")
+        self.log(f" Max Signals/Day: {self.max_signals_per_day}")
         self.log("=" * 80)
         
         cycle = 0
@@ -370,14 +360,14 @@ Buy now on your exchange! 📲"""
                 if self.is_market_hours():
                     self.run_cycle()
                 else:
-                    self.log("⏳ Market closed - waiting for market hours (9:30 AM - 4:00 PM EST)")
+                    self.log("⏳ Market closed - waiting for market hours (9:30 AM - 4:00 PM EDT)")
                 
                 self.log(f"📊 Active positions: {len([p for p in self.active_positions.values() if p['status'] == 'OPEN'])}")
-                self.log(f"⏱️  Next check in 30 min...")
-                time.sleep(1800)  # 30 minutes
+                self.log(f"⏱️ Next check in 30 min...")
+                time.sleep(1800)
         
         except KeyboardInterrupt:
-            self.log("\n⏹️  BOT STOPPED")
+            self.log("\n⏹️ BOT STOPPED")
         except Exception as e:
             self.log(f"\n❌ ERROR: {e}")
 
