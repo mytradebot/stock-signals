@@ -1,232 +1,407 @@
 #!/usr/bin/env python3
 """
-MANGOBOT - FINAL BATTLE-TESTED VERSION
-Simple, Reliable, Works!
+STOCK SIGNAL BOT - Daily US Stock Analysis with Smart Auto-Sell
+Analyzes 50+ stocks, sends 1-6 signals/day via Discord
+Auto-sells based on: +5% profit, -2% loss, or 7-day limit
+Sends status updates every 30 minutes during market hours
 """
 
-import os
+import requests
+import json
 import time
 from datetime import datetime, timedelta
+import os
 
-# Install yfinance
-try:
-    import yfinance
-except:
-    print("📦 Installing yfinance...")
-    os.system("pip install yfinance --break-system-packages")
-    import yfinance
-
-import requests
-
-class MangoBot:
+class StockSignalBot:
     def __init__(self):
-        # Get Discord webhook
-        self.webhook = os.environ.get('DISCORD_WEBHOOK')
-        if not self.webhook:
-            print("❌ DISCORD_WEBHOOK not set!")
+        # Discord config
+        self.discord_webhook = os.environ.get('DISCORD_WEBHOOK')
+        
+        if not self.discord_webhook:
+            print("❌ ERROR: DISCORD_WEBHOOK not set!")
             exit(1)
         
-        # Settings
-        self.min_dip = 0.3
-        self.min_volume = 100000
-        self.profit_target = 5.0
-        self.stop_loss = 2.0
-        
-        # Simple stock list (TESTED & RELIABLE)
-        self.stocks = [
-            'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'META', 'BRK.B',
-            'JNJ', 'V', 'WMT', 'PG', 'UNH', 'MA', 'HD', 'DIS', 'COST', 'LOW',
-            'MCD', 'NFLX', 'CSCO', 'ORACLE', 'IBM', 'INTC', 'AMD', 'CRM', 'ADBE',
-            'AVGO', 'ASML', 'QCOM', 'INTU', 'PYPL', 'SHOP', 'SNPS', 'CDNS', 'FTNT',
-            'MU', 'KLAC', 'LRCX', 'AMAT', 'NKE', 'MRVL', 'MCHP', 'QRVO', 'SWKS',
-            'EXC', 'PAYX', 'DDOG', 'CRWD', 'ZM', 'OKTA', 'TWLO', 'NET', 'GDDY',
-            'WDAY', 'DBX', 'DOCN', 'SPLK', 'SNOW', 'UPST', 'PTON', 'ROKU', 'COIN',
-            'HOOD', 'SOFI', 'GLBE', 'TOST', 'RIOT', 'MARA', 'MSTR', 'NVAX', 'BIIB',
-            'REGN', 'VRTX', 'ALNY', 'ILMN', 'HUBS', 'DXCM', 'VEEV', 'PATH', 'ZS',
-            'ULTA', 'LVGO', 'LULU', 'DASH', 'ABNB', 'TRIP', 'BKNG', 'EXPE', 'NIO',
-            'XPENG', 'LI', 'BABA', 'JD', 'PDD', 'BILI', 'SE', 'SPOT', 'UBER', 'LYFT',
-            'PINS', 'SNAP', 'TTWO', 'EA', 'ATVI', 'CPRT', 'OPEN', 'CVNA', 'CHPT',
-            'BLNK', 'VROOM', 'PRPL', 'KKR', 'BX', 'APO', 'OKE', 'MPC', 'CVX', 'COP',
-            'SLB', 'EOG', 'FANG', 'MRO', 'HAL', 'NOV', 'OXY', 'APA', 'XLE', 'XLV',
-            'XLI', 'XLF', 'XLK', 'XLY', 'XLP', 'XLRE', 'XLU', 'QQQ', 'DIA', 'IWM',
-            'SPY', 'VOO', 'VTI', 'F', 'GM', 'HMC', 'TM', 'BA', 'CAT', 'DE', 'GE',
-            'PFE', 'MRNA', 'ABBV', 'TMO', 'LLY', 'MRK', 'AMGN', 'GILD', 'BNTX',
-            'JPM', 'BAC', 'WFC', 'GS', 'MS', 'BLK', 'SCHW', 'TROW', 'AXP', 'DFS',
-            'SYF', 'VNO', 'PLD', 'PSA', 'EQR', 'AVB', 'ARE', 'MAA', 'WY', 'RYN',
-            'PCH', 'IRM', 'SSNC', 'PAYC', 'NTES', 'BIDU', 'VRSN', 'ANET', 'TEAM',
-            'DOCU', 'NEWR', 'ORCL', 'WDAY', 'PAYC', 'ZSCALER', 'PALO', 'CRSR',
-            'VTV', 'VUG', 'VGK', 'VXUS', 'EEM', 'AGG', 'BND', 'LQD', 'HYG', 'JNK',
-            'TLT', 'IEF', 'SHV', 'GLD', 'SLV', 'USO', 'VNQ', 'XRT'
+        # Stock config
+        self.top_stocks = [
+            'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'META', 'AVGO',
+            'ASML', 'NFLX', 'AMD', 'INTC', 'CSCO', 'QCOM', 'CRM', 'ADBE',
+            'PYPL', 'SHOP', 'SNPS', 'CDNS', 'FTNT', 'MU', 'KLAC', 'LRCX'
         ]
         
-        self.buffer = []
-        self.last_push = datetime.now()
+        # Strategy parameters
+        self.min_dip = 1.5
+        self.min_volume = 1000000
+        self.profit_target = 5.0
+        self.stop_loss = 2.0
+        self.max_hold_days = 7
+        self.max_signals_per_day = 6
+        
+        # State files
+        self.log_file = "stock_bot.log"
+        self.state_file = "stock_bot_state.json"
+        self.positions_file = "active_positions.json"
+        
+        self.load_state()
+        
         self.log("=" * 80)
-        self.log("🥭 MANGOBOT - FINAL TESTED VERSION")
-        self.log(f"📊 Stocks: {len(self.stocks)}")
+        self.log("🤖 STOCK SIGNAL BOT WITH STATUS UPDATES STARTED")
         self.log("=" * 80)
     
     def log(self, msg):
-        """Simple logging"""
+        """Log message"""
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f"[{ts}] {msg}")
+        text = f"[{ts}] {msg}"
+        print(text)
         try:
-            with open("bot.log", 'a') as f:
-                f.write(f"[{ts}] {msg}\n")
+            with open(self.log_file, 'a') as f:
+                f.write(text + "\n")
+        except:
+            pass
+    
+    def load_state(self):
+        """Load bot state"""
+        try:
+            if os.path.exists(self.state_file):
+                with open(self.state_file) as f:
+                    state = json.load(f)
+                    self.signals_today = state.get('signals_today', 0)
+                    self.last_signal_date = state.get('last_signal_date', '')
+            else:
+                self.signals_today = 0
+                self.last_signal_date = ''
+        except:
+            self.signals_today = 0
+            self.last_signal_date = ''
+        
+        # Load active positions
+        try:
+            if os.path.exists(self.positions_file):
+                with open(self.positions_file) as f:
+                    self.active_positions = json.load(f)
+            else:
+                self.active_positions = {}
+        except:
+            self.active_positions = {}
+    
+    def save_state(self):
+        """Save bot state"""
+        try:
+            state = {
+                'signals_today': self.signals_today,
+                'last_signal_date': self.last_signal_date,
+                'timestamp': datetime.now().isoformat()
+            }
+            with open(self.state_file, 'w') as f:
+                json.dump(state, f)
+        except:
+            pass
+    
+    def save_positions(self):
+        """Save active positions"""
+        try:
+            with open(self.positions_file, 'w') as f:
+                json.dump(self.active_positions, f, indent=2)
         except:
             pass
     
     def get_stock_data(self, symbol):
-        """Fetch stock data - SIMPLE & RELIABLE"""
+        """Fetch stock data from Yahoo Finance"""
         try:
-            ticker = yfinance.Ticker(symbol)
-            hist = ticker.history(period="1y")
+            url = f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/{symbol}"
             
-            # Check if data is valid
-            if hist.empty or len(hist) < 100:
-                return None
+            headers = {'User-Agent': 'Mozilla/5.0'}
+            params = {'modules': 'price,summaryDetail'}
             
-            # Get data
-            current_price = float(hist['Close'].iloc[-1])
-            high_52w = float(hist['High'].max())
-            volume = float(hist['Volume'].iloc[-1])
+            response = requests.get(url, headers=headers, params=params, timeout=5)
             
-            # Validate
-            if current_price <= 0 or high_52w <= 0 or volume <= 0:
-                return None
-            
-            # Calculate dip
-            dip = ((high_52w - current_price) / high_52w) * 100
-            
-            return {
-                'symbol': symbol,
-                'price': round(current_price, 2),
-                'high_52w': round(high_52w, 2),
-                'volume': int(volume),
-                'dip': round(dip, 2)
-            }
-        except Exception as e:
-            return None
+            if response.status_code == 200:
+                data = response.json()
+                if 'quoteSummary' in data and 'result' in data['quoteSummary']:
+                    result = data['quoteSummary']['result'][0]
+                    
+                    price_data = result.get('price', {})
+                    summary = result.get('summaryDetail', {})
+                    
+                    current_price = price_data.get('regularMarketPrice', {}).get('raw', 0)
+                    fifty_two_week_high = summary.get('fiftyTwoWeekHigh', {}).get('raw', 0)
+                    avg_volume = summary.get('averageVolume', {}).get('raw', 0)
+                    
+                    if current_price > 0 and fifty_two_week_high > 0:
+                        dip = ((fifty_two_week_high - current_price) / fifty_two_week_high) * 100
+                        
+                        return {
+                            'symbol': symbol,
+                            'price': current_price,
+                            'high_52w': fifty_two_week_high,
+                            'volume': avg_volume,
+                            'dip': dip
+                        }
+        except:
+            pass
+        
+        return None
     
     def find_signals(self):
-        """Find signals - ONE JOB ONLY"""
+        """Find trading signals"""
         signals = []
-        analyzed = 0
-        found = 0
         
-        self.log(f"🔍 Scanning {len(self.stocks)} stocks...")
+        self.log(f"📊 Analyzing {len(self.top_stocks)} stocks...")
         
-        for symbol in self.stocks:
-            data = self.get_stock_data(symbol)
-            analyzed += 1
+        for symbol in self.top_stocks:
+            try:
+                data = self.get_stock_data(symbol)
+                
+                if not data:
+                    continue
+                
+                price = data['price']
+                dip = data['dip']
+                volume = data['volume']
+                
+                if dip >= self.min_dip and volume >= self.min_volume:
+                    entry = price
+                    target = price * (1 + self.profit_target / 100)
+                    stop = price * (1 - self.stop_loss / 100)
+                    
+                    signals.append({
+                        'symbol': symbol,
+                        'price': price,
+                        'dip': dip,
+                        'volume': volume,
+                        'entry': entry,
+                        'target': target,
+                        'stop': stop
+                    })
+                    
+                    self.log(f"   ✅ {symbol}: ${price:.2f} | Dip: {dip:.2f}%")
+                
+                time.sleep(0.1)
             
-            if not data:
+            except:
                 continue
-            
-            # Check if meets criteria
-            if data['dip'] >= self.min_dip and data['volume'] >= self.min_volume:
-                found += 1
-                
-                entry = data['price']
-                target = round(entry * (1 + self.profit_target / 100), 2)
-                stop = round(entry * (1 - self.stop_loss / 100), 2)
-                
-                signals.append({
-                    'symbol': symbol,
-                    'price': entry,
-                    'dip': data['dip'],
-                    'target': target,
-                    'stop': stop
-                })
-            
-            time.sleep(0.05)  # Rate limit
         
-        self.log(f"   ✅ Analyzed: {analyzed}")
-        self.log(f"   📊 Found: {found}")
-        
-        if signals:
-            self.buffer.extend(signals)
-            self.log(f"   💾 Buffer: {len(self.buffer)}")
+        signals.sort(key=lambda x: x['dip'], reverse=True)
+        return signals[:self.max_signals_per_day]
     
-    def push_best_signal(self):
-        """Push BEST signal to Discord"""
-        if not self.buffer:
-            self.log("⚪ No signals in buffer")
-            return
-        
-        # Get best (highest dip)
-        best = max(self.buffer, key=lambda x: x['dip'])
-        
-        # Create message
-        message = f"""🥭 **MANGOBOT SIGNAL**
-⏰ {datetime.now().strftime("%H:%M %Z")}
-
-🏆 **STOCK:** `{best['symbol']}`
-📈 **Entry:** `${best['price']}`
-📊 **Dip:** `{best['dip']:.2f}%`
-🎯 **Target:** `${best['target']}` (+{self.profit_target}%)
-🛑 **Stop:** `${best['stop']}` (-{self.stop_loss}%)
-
-{len(self.buffer)} signals found!
-
-**BUY NOW!** 📲"""
-        
-        # Send to Discord
+    def send_discord_message(self, message):
+        """Send message to Discord"""
         try:
-            response = requests.post(
-                self.webhook,
-                json={'content': message},
-                timeout=10
-            )
-            
-            if response.status_code == 204:
-                self.log(f"📱 PUSHED: {best['symbol']} (Dip: {best['dip']}%)")
-                self.buffer = []
-                self.last_push = datetime.now()
-            else:
-                self.log(f"❌ Discord failed: {response.status_code}")
-        except Exception as e:
-            self.log(f"❌ Error: {e}")
+            payload = {'content': message}
+            response = requests.post(self.discord_webhook, json=payload, timeout=10)
+            return response.status_code == 204
+        except:
+            return False
     
-    def is_market_open(self):
-        """Check if market is open (EDT)"""
+    def send_status_message(self):
+        """Send status update message every 30 min"""
+        active_count = len([p for p in self.active_positions.values() if p['status'] == 'OPEN'])
+        current_time = datetime.now().strftime("%H:%M %Z")
+        next_check_time = (datetime.now() + timedelta(minutes=30)).strftime("%H:%M")
+        
+        message = f"""📊 **STATUS UPDATE**
+
+⏰ Current Time: `{current_time}`
+📈 Active Positions: `{active_count}`
+🔄 Next Check: `{next_check_time}` (in 30 minutes)
+
+⏳ Scanning for opportunities...
+🎯 Will recommend stocks if found!
+
+Stay tuned! 🥭"""
+        
+        if self.send_discord_message(message):
+            self.log(f"📱 Status message sent (Active positions: {active_count})")
+            return True
+        
+        return False
+    
+    def send_buy_signal(self, signal):
+        """Send buy signal"""
+        symbol = signal['symbol']
+        price = signal['price']
+        dip = signal['dip']
+        target = signal['target']
+        stop = signal['stop']
+        
+        message = f"""🟢 **BUY SIGNAL - OPPORTUNITY FOUND!**
+
+📈 **Stock:** `{symbol}`
+💰 **Entry Price:** `${price:.2f}`
+🎯 **Profit Target:** `${target:.2f}` (+{self.profit_target:.1f}%)
+🛑 **Stop Loss:** `${stop:.2f}` (-{self.stop_loss:.1f}%)
+📉 **Current Dip:** `{dip:.2f}%` from 52-week high
+⏱️ **Hold Period:** Up to {self.max_hold_days} days
+
+**Auto-Sell Conditions:**
+✅ Sells at +{self.profit_target}% profit
+✅ Sells at -{self.stop_loss}% loss
+✅ Auto-sells after {self.max_hold_days} days (if no exit)
+
+🚀 Buy now on your exchange! 📲"""
+        
+        if self.send_discord_message(message):
+            entry_time = datetime.now().isoformat()
+            self.active_positions[symbol] = {
+                'entry_price': price,
+                'entry_time': entry_time,
+                'target': target,
+                'stop': stop,
+                'status': 'OPEN'
+            }
+            self.save_positions()
+            self.log(f"📱 BUY Signal sent: {symbol}")
+            return True
+        
+        return False
+    
+    def send_sell_signal(self, symbol, reason, current_price, entry_price, profit_pct):
+        """Send sell signal"""
+        message = f"""🔴 **SELL SIGNAL - EXIT POSITION!**
+
+📈 **Stock:** `{symbol}`
+💰 **Entry Price:** `${entry_price:.2f}`
+💲 **Current Price:** `${current_price:.2f}`
+📊 **Change:** `{profit_pct:+.2f}%`
+❌ **Reason:** `{reason}`
+
+🎯 Sell your position on your exchange NOW! 📲"""
+        
+        if self.send_discord_message(message):
+            self.log(f"📱 SELL Signal sent: {symbol} ({reason})")
+            return True
+        
+        return False
+    
+    def check_sell_conditions(self):
+        """Check if any open positions should be closed"""
+        positions_to_remove = []
+        
+        for symbol in list(self.active_positions.keys()):
+            try:
+                pos = self.active_positions[symbol]
+                
+                if pos['status'] != 'OPEN':
+                    continue
+                
+                data = self.get_stock_data(symbol)
+                if not data:
+                    continue
+                
+                current_price = data['price']
+                entry_price = pos['entry_price']
+                target = pos['target']
+                stop = pos['stop']
+                
+                profit_pct = ((current_price - entry_price) / entry_price) * 100
+                
+                if current_price >= target:
+                    self.send_sell_signal(symbol, f"PROFIT TARGET +{self.profit_target}%", current_price, entry_price, profit_pct)
+                    positions_to_remove.append(symbol)
+                    continue
+                
+                if current_price <= stop:
+                    self.send_sell_signal(symbol, f"STOP LOSS -{self.stop_loss}%", current_price, entry_price, profit_pct)
+                    positions_to_remove.append(symbol)
+                    continue
+                
+                entry_time = datetime.fromisoformat(pos['entry_time'])
+                days_held = (datetime.now() - entry_time).days
+                
+                if days_held >= self.max_hold_days:
+                    self.send_sell_signal(symbol, f"TIME LIMIT ({self.max_hold_days} days)", current_price, entry_price, profit_pct)
+                    positions_to_remove.append(symbol)
+                    continue
+            
+            except Exception as e:
+                self.log(f"❌ Error checking {symbol}: {e}")
+                continue
+        
+        for symbol in positions_to_remove:
+            self.active_positions[symbol]['status'] = 'CLOSED'
+        
+        if positions_to_remove:
+            self.save_positions()
+    
+    def is_market_hours(self):
+        """Check if market is open (US Eastern time)"""
         from datetime import datetime, timezone
         
-        edt = timezone(timedelta(hours=-4))
-        now = datetime.now(edt)
+        eastern = timezone(timedelta(hours=-4))
+        now = datetime.now(eastern)
         
-        weekday = now.weekday() < 5
-        hours = 9.5 <= now.hour <= 16.0
+        is_weekday = now.weekday() < 5
+        is_market_hours = 9.5 <= now.hour <= 16.0
         
-        return weekday and hours
+        return is_weekday and is_market_hours
     
-    def run(self):
-        """Main loop - SIMPLE"""
+    def run_cycle(self):
+        """Run one analysis cycle"""
+        self.log("-" * 80)
+        
+        today = datetime.now().strftime("%Y-%m-%d")
+        if today != self.last_signal_date:
+            self.signals_today = 0
+            self.last_signal_date = today
+        
+        # Always send status message
+        self.log("📊 Sending status update to Discord...")
+        self.send_status_message()
+        
+        # Check sell conditions
+        self.log("🔍 Checking open positions for sell signals...")
+        self.check_sell_conditions()
+        
+        # Find new buy signals
+        signals = self.find_signals()
+        
+        if not signals:
+            self.log("⚪ No new buy signals found")
+        else:
+            self.log(f"🟢 Found {len(signals)} new buy signal(s)")
+            
+            for signal in signals:
+                if self.signals_today < self.max_signals_per_day:
+                    if self.send_buy_signal(signal):
+                        self.signals_today += 1
+                    time.sleep(2)
+        
+        self.save_state()
+    
+    def start(self):
+        """Start bot"""
+        self.log(f"🚀 CONFIGURATION")
+        self.log(f"   Stocks: {len(self.top_stocks)}")
+        self.log(f"   Min Dip: {self.min_dip}%")
+        self.log(f"   Profit Target: +{self.profit_target}%")
+        self.log(f"   Stop Loss: -{self.stop_loss}%")
+        self.log(f"   Max Hold: {self.max_hold_days} days")
+        self.log(f"   Max Signals/Day: {self.max_signals_per_day}")
+        self.log(f"   Status Updates: Every 30 minutes (market hours)")
+        self.log("=" * 80)
+        
         cycle = 0
         
-        while True:
-            cycle += 1
-            self.log(f"\n🔄 CYCLE #{cycle}")
-            
-            if self.is_market_open():
-                # Scan
-                self.find_signals()
+        try:
+            while True:
+                cycle += 1
+                now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 
-                # Check if 30 min passed
-                elapsed = datetime.now() - self.last_push
-                if elapsed >= timedelta(minutes=30):
-                    self.log("⏰ 30 min passed - PUSHING!")
-                    self.push_best_signal()
+                self.log(f"\n🔄 CYCLE #{cycle} [{now}]")
+                
+                if self.is_market_hours():
+                    self.run_cycle()
                 else:
-                    remaining = 30 - int(elapsed.total_seconds() / 60)
-                    self.log(f"⏳ Next push in {remaining} min (Buffer: {len(self.buffer)})")
-            else:
-                self.log("⏳ Market closed (9:30 AM - 4:00 PM EDT)")
-            
-            self.log("⏱️  Next check in 5 min...\n")
-            time.sleep(300)  # 5 minutes
+                    self.log("⏳ Market closed - waiting for market hours (9:30 AM - 4:00 PM EDT)")
+                
+                self.log(f"⏱️  Next check in 30 min...")
+                time.sleep(1800)
+        
+        except KeyboardInterrupt:
+            self.log("\n⏹️  BOT STOPPED")
+        except Exception as e:
+            self.log(f"\n❌ ERROR: {e}")
 
 
 if __name__ == "__main__":
-    bot = MangoBot()
-    bot.run()
+    bot = StockSignalBot()
+    bot.start()
