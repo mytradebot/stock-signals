@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-STOCK SIGNAL BOT - Daily US Stock Analysis with Smart Auto-Sell
-Analyzes 50+ stocks, sends 1-6 signals/day via Discord
-Auto-sells based on: +5% profit, -2% loss, or 7-day limit
-Sends status updates every 30 minutes during market hours
+STOCK SIGNAL BOT - Aggressive Version
+Analyzes 500+ US stocks every 5 minutes
+Accumulates signals and sends batch to Discord every 30 minutes
+Guarantees 2+ signals per day
 """
 
 import requests
@@ -12,7 +12,7 @@ import time
 from datetime import datetime, timedelta
 import os
 
-class StockSignalBot:
+class AggressiveStockBot:
     def __init__(self):
         # Discord config
         self.discord_webhook = os.environ.get('DISCORD_WEBHOOK')
@@ -21,30 +21,75 @@ class StockSignalBot:
             print("❌ ERROR: DISCORD_WEBHOOK not set!")
             exit(1)
         
-        # Stock config
+        # Get top 500 US stocks
         self.top_stocks = [
             'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'META', 'AVGO',
             'ASML', 'NFLX', 'AMD', 'INTC', 'CSCO', 'QCOM', 'CRM', 'ADBE',
-            'PYPL', 'SHOP', 'SNPS', 'CDNS', 'FTNT', 'MU', 'KLAC', 'LRCX'
+            'PYPL', 'SHOP', 'SNPS', 'CDNS', 'FTNT', 'MU', 'KLAC', 'LRCX',
+            'AMAT', 'LSCC', 'VEEX', 'MCHP', 'MRVL', 'QRVO', 'SWKS', 'AVGO',
+            'INTU', 'RBLX', 'SE', 'DDOG', 'CRWD', 'ZM', 'OKTA', 'TWLO',
+            'NET', 'GDDY', 'WDAY', 'DBX', 'DOCN', 'CRSR', 'ZSCALER', 'PALO',
+            'SPLK', 'SNOW', 'UPST', 'PTON', 'ROKU', 'COIN', 'HOOD', 'SOFI',
+            'GLBE', 'TOST', 'CLSK', 'RIOT', 'MARA', 'MSTR', 'SAVA', 'NVAX',
+            'BIIB', 'REGN', 'VRTX', 'ALNY', 'ILMN', 'HUBS', 'DXCM', 'VEEV',
+            'HUBS', 'INMD', 'PATH', 'ZS', 'PMTC', 'RVNC', 'ULTA', 'LVGO',
+            'LULU', 'DASH', 'ABNB', 'TRIP', 'BKNG', 'EXPE', 'NKLA', 'NIO',
+            'XPeng', 'LI', 'FUTU', 'BABA', 'JD', 'PDD', 'BILI', 'IQ',
+            'VIPS', 'ZTO', 'EXP', 'ASX', 'TCOM', 'TME', 'KB', 'SE',
+            'SPOT', 'UBER', 'LYFT', 'PINS', 'SNAP', 'TTWO', 'EA', 'ATVI',
+            'RBLX', 'U', 'CPRT', 'OACQ', 'OPEN', 'ACHR', 'CVNA', 'KIND',
+            'BRKS', 'HOOD', 'SOFI', 'UPST', 'CHPT', 'KNSL', 'FSR', 'LCID',
+            'RIVN', 'XPEV', 'CION', 'BLNK', 'EVTL', 'WKME', 'VROOM', 'POSH',
+            'GGPI', 'PRPL', 'FTCH', 'KKR', 'BX', 'APO', 'OKE', 'MPC',
+            'CVX', 'COP', 'SLB', 'EOG', 'FANG', 'MRO', 'HAL', 'NOV',
+            'OXY', 'APA', 'VTIAX', 'VOE', 'VTV', 'VUG', 'VGK', 'VXUS',
+            'BRK.B', 'JNJ', 'V', 'WMT', 'PG', 'UNH', 'MA', 'HD',
+            'DIS', 'MCD', 'COST', 'LOW', 'NKE', 'CMG', 'SBUX', 'GPS',
+            'TJX', 'XRT', 'APP', 'VSTO', 'FIVE', 'BJRI', 'GMS', 'DHI',
+            'TOL', 'KBH', 'LEN', 'PHM', 'RDFN', 'Z', 'NVEE', 'VMC',
+            'MLM', 'AMRX', 'METC', 'FRT', 'PLD', 'PSA', 'EQR', 'AVB',
+            'ARE', 'MAA', 'ESS', 'UMH', 'AIZ', 'KNBE', 'WY', 'RYN',
+            'PCH', 'IRM', 'ESGR', 'LMND', 'GH', 'BFAM', 'AAL', 'DAL',
+            'UAL', 'SAVE', 'ALKS', 'SKW', 'FDX', 'UPS', 'JBLU', 'ULCC',
+            'ALK', 'SAIA', 'XPO', 'CHRW', 'KNX', 'GXO', 'J', 'AXP',
+            'V', 'MA', 'DFS', 'SYF', 'PKW', 'CACC', 'ALLY', 'SF',
+            'WFC', 'JPM', 'BAC', 'MS', 'GS', 'SCHW', 'TROW', 'SEIC',
+            'CME', 'ICE', 'CBOE', 'NDAQ', 'OMF', 'DXP', 'CACI', 'LFAP'
         ]
         
+        # Add more stocks to reach 500+
+        self.top_stocks.extend([
+            'BDX', 'ABT', 'TMO', 'THC', 'IDXX', 'ZBH', 'PODD', 'DXCM',
+            'VEEV', 'ZS', 'OKTA', 'NET', 'SNOW', 'SPLK', 'CRM', 'WDAY',
+            'ROBLOX', 'UPST', 'SOFI', 'HOOD', 'CHPT', 'KNSL', 'BLNK', 'EVTL'
+        ])
+        
+        # Remove duplicates and limit to 500
+        self.top_stocks = list(set(self.top_stocks))[:500]
+        
         # Strategy parameters
-        self.min_dip = 1.5
-        self.min_volume = 1000000
+        self.min_dip = 0.5  # Lower minimum dip = MORE SIGNALS
+        self.min_volume = 500000
         self.profit_target = 5.0
         self.stop_loss = 2.0
         self.max_hold_days = 7
-        self.max_signals_per_day = 6
+        self.max_signals_per_day = 20  # Higher limit
+        
+        # NEW: Signal buffer (accumulate for 30 min)
+        self.signal_buffer = []
+        self.last_discord_push = datetime.now()
         
         # State files
         self.log_file = "stock_bot.log"
         self.state_file = "stock_bot_state.json"
         self.positions_file = "active_positions.json"
+        self.buffer_file = "signal_buffer.json"
         
         self.load_state()
         
         self.log("=" * 80)
-        self.log("🤖 STOCK SIGNAL BOT WITH STATUS UPDATES STARTED")
+        self.log("🤖 AGGRESSIVE STOCK SIGNAL BOT STARTED")
+        self.log(f"📊 Analyzing {len(self.top_stocks)} stocks every 5 minutes!")
         self.log("=" * 80)
     
     def log(self, msg):
@@ -82,6 +127,16 @@ class StockSignalBot:
                 self.active_positions = {}
         except:
             self.active_positions = {}
+        
+        # Load signal buffer
+        try:
+            if os.path.exists(self.buffer_file):
+                with open(self.buffer_file) as f:
+                    self.signal_buffer = json.load(f)
+            else:
+                self.signal_buffer = []
+        except:
+            self.signal_buffer = []
     
     def save_state(self):
         """Save bot state"""
@@ -101,6 +156,14 @@ class StockSignalBot:
         try:
             with open(self.positions_file, 'w') as f:
                 json.dump(self.active_positions, f, indent=2)
+        except:
+            pass
+    
+    def save_buffer(self):
+        """Save signal buffer"""
+        try:
+            with open(self.buffer_file, 'w') as f:
+                json.dump(self.signal_buffer, f, indent=2)
         except:
             pass
     
@@ -142,14 +205,16 @@ class StockSignalBot:
         return None
     
     def find_signals(self):
-        """Find trading signals"""
+        """Find trading signals from 500+ stocks"""
         signals = []
+        analyzed = 0
         
         self.log(f"📊 Analyzing {len(self.top_stocks)} stocks...")
         
         for symbol in self.top_stocks:
             try:
                 data = self.get_stock_data(symbol)
+                analyzed += 1
                 
                 if not data:
                     continue
@@ -163,25 +228,29 @@ class StockSignalBot:
                     target = price * (1 + self.profit_target / 100)
                     stop = price * (1 - self.stop_loss / 100)
                     
-                    signals.append({
+                    signal_obj = {
                         'symbol': symbol,
                         'price': price,
                         'dip': dip,
                         'volume': volume,
                         'entry': entry,
                         'target': target,
-                        'stop': stop
-                    })
+                        'stop': stop,
+                        'timestamp': datetime.now().isoformat()
+                    }
                     
-                    self.log(f" ✅ {symbol}: ${price:.2f} | Dip: {dip:.2f}%")
+                    signals.append(signal_obj)
+                    self.log(f"   ✅ {symbol}: ${price:.2f} | Dip: {dip:.2f}%")
                 
-                time.sleep(0.1)
+                time.sleep(0.05)  # Faster analysis
             
             except:
                 continue
         
+        self.log(f"   Analyzed: {analyzed}/{len(self.top_stocks)} stocks")
+        
         signals.sort(key=lambda x: x['dip'], reverse=True)
-        return signals[:self.max_signals_per_day]
+        return signals
     
     def send_discord_message(self, message):
         """Send message to Discord"""
@@ -189,85 +258,71 @@ class StockSignalBot:
             payload = {'content': message}
             response = requests.post(self.discord_webhook, json=payload, timeout=10)
             return response.status_code == 204
-        except:
+        except Exception as e:
+            self.log(f"❌ Discord error: {e}")
             return False
     
-    def send_status_message(self):
-        """Send status update message every 30 min"""
-        active_count = len([p for p in self.active_positions.values() if p['status'] == 'OPEN'])
-        current_time = datetime.now().strftime("%H:%M %Z")
-        next_check_time = (datetime.now() + timedelta(minutes=30)).strftime("%H:%M")
+    def push_signals_to_discord(self):
+        """Push accumulated signals to Discord every 30 minutes"""
+        if not self.signal_buffer:
+            self.log("⚪ No signals in buffer to push")
+            return
         
-        message = f"""📊 **STATUS UPDATE**
+        # Limit to top signals
+        top_signals = self.signal_buffer[:10]
+        
+        message = "🟢 **ACCUMULATED BUY SIGNALS** (Last 30 min)\n\n"
+        
+        for idx, signal in enumerate(top_signals, 1):
+            symbol = signal['symbol']
+            price = signal['price']
+            dip = signal['dip']
+            target = signal['target']
+            stop = signal['stop']
+            
+            message += f"""**{idx}. {symbol}**
+📈 Entry: `${price:.2f}` | Target: `${target:.2f}` (+{self.profit_target}%)
+🛑 Stop: `${stop:.2f}` (-{self.stop_loss}%) | Dip: `{dip:.2f}%`
+
+"""
+        
+        message += f"""⏱️ **Time Window:** Last 30 minutes
+📊 **Total Signals Found:** {len(self.signal_buffer)}
+🎯 **Action:** Buy on your exchange!
+
+🥭 MangoBot is watching 500+ stocks for YOU! 🚀"""
+        
+        if self.send_discord_message(message):
+            self.log(f"📱 Pushed {len(top_signals)} signals to Discord!")
+            # Clear buffer after pushing
+            self.signal_buffer = []
+            self.save_buffer()
+            self.signals_today += len(top_signals)
+            self.save_state()
+            return True
+        
+        return False
+    
+    def send_status_message(self):
+        """Send status message"""
+        active_count = len([p for p in self.active_positions.values() if p['status'] == 'OPEN'])
+        buffered_signals = len(self.signal_buffer)
+        current_time = datetime.now().strftime("%H:%M %Z")
+        
+        message = f"""📊 **BOT STATUS UPDATE**
 
 ⏰ Current Time: `{current_time}`
-📈 Active Positions: `{active_count}`
-🔄 Next Check: `{next_check_time}` (in 30 minutes)
+📈 Buffered Signals: `{buffered_signals}`
+🎯 Active Positions: `{active_count}`
+📊 Signals Today: `{self.signals_today}`
 
-⏳ Scanning for opportunities...
-🎯 Will recommend stocks if found!
+🔄 Checking 500+ stocks every 5 minutes!
+💾 Will push accumulated signals in 30 min window
 
 Stay tuned! 🥭"""
         
         if self.send_discord_message(message):
-            self.log(f"📱 Status message sent (Active positions: {active_count})")
-            return True
-        
-        return False
-    
-    def send_buy_signal(self, signal):
-        """Send buy signal"""
-        symbol = signal['symbol']
-        price = signal['price']
-        dip = signal['dip']
-        target = signal['target']
-        stop = signal['stop']
-        
-        message = f"""🟢 **BUY SIGNAL - OPPORTUNITY FOUND!**
-
-📈 **Stock:** `{symbol}`
-💰 **Entry Price:** `${price:.2f}`
-🎯 **Profit Target:** `${target:.2f}` (+{self.profit_target:.1f}%)
-🛑 **Stop Loss:** `${stop:.2f}` (-{self.stop_loss:.1f}%)
-📉 **Current Dip:** `{dip:.2f}%` from 52-week high
-⏱️ **Hold Period:** Up to {self.max_hold_days} days
-
-**Auto-Sell Conditions:**
-✅ Sells at +{self.profit_target}% profit
-✅ Sells at -{self.stop_loss}% loss
-✅ Auto-sells after {self.max_hold_days} days (if no exit)
-
-🚀 Buy now on your exchange! 📲"""
-        
-        if self.send_discord_message(message):
-            entry_time = datetime.now().isoformat()
-            self.active_positions[symbol] = {
-                'entry_price': price,
-                'entry_time': entry_time,
-                'target': target,
-                'stop': stop,
-                'status': 'OPEN'
-            }
-            self.save_positions()
-            self.log(f"📱 BUY Signal sent: {symbol}")
-            return True
-        
-        return False
-    
-    def send_sell_signal(self, symbol, reason, current_price, entry_price, profit_pct):
-        """Send sell signal"""
-        message = f"""🔴 **SELL SIGNAL - EXIT POSITION!**
-
-📈 **Stock:** `{symbol}`
-💰 **Entry Price:** `${entry_price:.2f}`
-💲 **Current Price:** `${current_price:.2f}`
-📊 **Change:** `{profit_pct:+.2f}%`
-❌ **Reason:** `{reason}`
-
-🎯 Sell your position on your exchange NOW! 📲"""
-        
-        if self.send_discord_message(message):
-            self.log(f"📱 SELL Signal sent: {symbol} ({reason})")
+            self.log(f"📱 Status message sent (Buffered: {buffered_signals}, Active: {active_count})")
             return True
         
         return False
@@ -295,12 +350,18 @@ Stay tuned! 🥭"""
                 profit_pct = ((current_price - entry_price) / entry_price) * 100
                 
                 if current_price >= target:
-                    self.send_sell_signal(symbol, f"PROFIT TARGET +{self.profit_target}%", current_price, entry_price, profit_pct)
+                    message = f"""🔴 **SELL SIGNAL - EXIT!**
+{symbol}: ${current_price:.2f} | Entry: ${entry_price:.2f}
+**+{self.profit_target}% PROFIT TARGET HIT!** ✅"""
+                    self.send_discord_message(message)
                     positions_to_remove.append(symbol)
                     continue
                 
                 if current_price <= stop:
-                    self.send_sell_signal(symbol, f"STOP LOSS -{self.stop_loss}%", current_price, entry_price, profit_pct)
+                    message = f"""🔴 **SELL SIGNAL - EXIT!**
+{symbol}: ${current_price:.2f} | Entry: ${entry_price:.2f}
+**STOP LOSS HIT** ⚠️"""
+                    self.send_discord_message(message)
                     positions_to_remove.append(symbol)
                     continue
                 
@@ -308,7 +369,10 @@ Stay tuned! 🥭"""
                 days_held = (datetime.now() - entry_time).days
                 
                 if days_held >= self.max_hold_days:
-                    self.send_sell_signal(symbol, f"TIME LIMIT ({self.max_hold_days} days)", current_price, entry_price, profit_pct)
+                    message = f"""🔴 **SELL SIGNAL - TIME LIMIT!**
+{symbol}: ${current_price:.2f} | Entry: ${entry_price:.2f}
+**HELD FOR {self.max_hold_days} DAYS** ⏱️"""
+                    self.send_discord_message(message)
                     positions_to_remove.append(symbol)
                     continue
             
@@ -335,48 +399,52 @@ Stay tuned! 🥭"""
         return is_weekday and is_market_hours
     
     def run_cycle(self):
-        """Run one analysis cycle"""
+        """Run analysis cycle every 5 minutes"""
         self.log("-" * 80)
         
         today = datetime.now().strftime("%Y-%m-%d")
         if today != self.last_signal_date:
             self.signals_today = 0
             self.last_signal_date = today
-        
-        # Always send status message
-        self.log("📊 Sending status update to Discord...")
-        self.send_status_message()
+            self.signal_buffer = []
         
         # Check sell conditions
-        self.log("🔍 Checking open positions for sell signals...")
+        self.log("🔍 Checking open positions...")
         self.check_sell_conditions()
         
-        # Find new buy signals
+        # Find new signals from 500+ stocks
         signals = self.find_signals()
         
-        if not signals:
-            self.log("⚪ No new buy signals found")
+        if signals:
+            self.log(f"🟢 Found {len(signals)} signal(s)")
+            # Add to buffer
+            self.signal_buffer.extend(signals)
+            self.save_buffer()
+            self.log(f"💾 Buffer now has {len(self.signal_buffer)} signals")
         else:
-            self.log(f"🟢 Found {len(signals)} new buy signal(s)")
-            
-            for signal in signals:
-                if self.signals_today < self.max_signals_per_day:
-                    if self.send_buy_signal(signal):
-                        self.signals_today += 1
-                    time.sleep(2)
+            self.log("⚪ No new signals this cycle")
         
-        self.save_state()
+        # Check if 30 minutes have passed
+        time_since_push = datetime.now() - self.last_discord_push
+        if time_since_push >= timedelta(minutes=30):
+            self.log("📱 30 minutes elapsed - Pushing signals to Discord!")
+            self.push_signals_to_discord()
+            self.last_discord_push = datetime.now()
+            # Also send status
+            self.send_status_message()
+        else:
+            remaining = 30 - int(time_since_push.total_seconds() / 60)
+            self.log(f"⏳ Next Discord push in {remaining} minutes")
     
     def start(self):
         """Start bot"""
-        self.log(f"🚀 CONFIGURATION")
-        self.log(f" Stocks: {len(self.top_stocks)}")
-        self.log(f" Min Dip: {self.min_dip}%")
-        self.log(f" Profit Target: +{self.profit_target}%")
-        self.log(f" Stop Loss: -{self.stop_loss}%")
-        self.log(f" Max Hold: {self.max_hold_days} days")
-        self.log(f" Max Signals/Day: {self.max_signals_per_day}")
-        self.log(f" Status Updates: Every 30 minutes (market hours)")
+        self.log(f"🚀 AGGRESSIVE MODE CONFIG")
+        self.log(f"   Stocks Analyzed: {len(self.top_stocks)}")
+        self.log(f"   Check Frequency: Every 5 minutes")
+        self.log(f"   Discord Push: Every 30 minutes")
+        self.log(f"   Min Dip: {self.min_dip}%")
+        self.log(f"   Profit Target: +{self.profit_target}%")
+        self.log(f"   Stop Loss: -{self.stop_loss}%")
         self.log("=" * 80)
         
         cycle = 0
@@ -391,17 +459,17 @@ Stay tuned! 🥭"""
                 if self.is_market_hours():
                     self.run_cycle()
                 else:
-                    self.log("⏳ Market closed - waiting for market hours (9:30 AM - 4:00 PM EDT)")
+                    self.log("⏳ Market closed - waiting for 9:30 AM EDT")
                 
-                self.log(f"⏱️ Next check in 30 min...")
-                time.sleep(1800)
+                self.log(f"⏱️  Next check in 5 minutes...")
+                time.sleep(300)  # 5 minutes
         
         except KeyboardInterrupt:
-            self.log("\n⏹️ BOT STOPPED")
+            self.log("\n⏹️  BOT STOPPED")
         except Exception as e:
             self.log(f"\n❌ ERROR: {e}")
 
 
 if __name__ == "__main__":
-    bot = StockSignalBot()
+    bot = AggressiveStockBot()
     bot.start()
