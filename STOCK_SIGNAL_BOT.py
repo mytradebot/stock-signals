@@ -3,6 +3,7 @@
 STOCK SIGNAL BOT - Daily US Stock Analysis with Smart Auto-Sell
 Analyzes 50+ stocks, sends 1-6 signals/day via Discord
 Auto-sells based on: +5% profit, -2% loss, or 7-day limit
+Sends status updates every 30 minutes during market hours
 """
 
 import requests
@@ -43,7 +44,7 @@ class StockSignalBot:
         self.load_state()
         
         self.log("=" * 80)
-        self.log("🤖 STOCK SIGNAL BOT WITH AUTO-SELL STARTED")
+        self.log("🤖 STOCK SIGNAL BOT WITH STATUS UPDATES STARTED")
         self.log("=" * 80)
     
     def log(self, msg):
@@ -182,7 +183,7 @@ class StockSignalBot:
         signals.sort(key=lambda x: x['dip'], reverse=True)
         return signals[:self.max_signals_per_day]
     
-    def send_discord_signal(self, message):
+    def send_discord_message(self, message):
         """Send message to Discord"""
         try:
             payload = {'content': message}
@@ -190,6 +191,29 @@ class StockSignalBot:
             return response.status_code == 204
         except:
             return False
+    
+    def send_status_message(self):
+        """Send status update message every 30 min"""
+        active_count = len([p for p in self.active_positions.values() if p['status'] == 'OPEN'])
+        current_time = datetime.now().strftime("%H:%M %Z")
+        next_check_time = (datetime.now() + timedelta(minutes=30)).strftime("%H:%M")
+        
+        message = f"""📊 **STATUS UPDATE**
+
+⏰ Current Time: `{current_time}`
+📈 Active Positions: `{active_count}`
+🔄 Next Check: `{next_check_time}` (in 30 minutes)
+
+⏳ Scanning for opportunities...
+🎯 Will recommend stocks if found!
+
+Stay tuned! 🥭"""
+        
+        if self.send_discord_message(message):
+            self.log(f"📱 Status message sent (Active positions: {active_count})")
+            return True
+        
+        return False
     
     def send_buy_signal(self, signal):
         """Send buy signal"""
@@ -199,7 +223,7 @@ class StockSignalBot:
         target = signal['target']
         stop = signal['stop']
         
-        message = f"""🟢 **BUY SIGNAL**
+        message = f"""🟢 **BUY SIGNAL - OPPORTUNITY FOUND!**
 
 📈 **Stock:** `{symbol}`
 💰 **Entry Price:** `${price:.2f}`
@@ -213,9 +237,9 @@ class StockSignalBot:
 ✅ Sells at -{self.stop_loss}% loss
 ✅ Auto-sells after {self.max_hold_days} days (if no exit)
 
-Buy now on your exchange! 📲"""
+🚀 Buy now on your exchange! 📲"""
         
-        if self.send_discord_signal(message):
+        if self.send_discord_message(message):
             entry_time = datetime.now().isoformat()
             self.active_positions[symbol] = {
                 'entry_price': price,
@@ -232,7 +256,7 @@ Buy now on your exchange! 📲"""
     
     def send_sell_signal(self, symbol, reason, current_price, entry_price, profit_pct):
         """Send sell signal"""
-        message = f"""🔴 **SELL SIGNAL**
+        message = f"""🔴 **SELL SIGNAL - EXIT POSITION!**
 
 📈 **Stock:** `{symbol}`
 💰 **Entry Price:** `${entry_price:.2f}`
@@ -240,9 +264,9 @@ Buy now on your exchange! 📲"""
 📊 **Change:** `{profit_pct:+.2f}%`
 ❌ **Reason:** `{reason}`
 
-**ACTION:** Sell your position on your exchange NOW! 📲"""
+🎯 Sell your position on your exchange NOW! 📲"""
         
-        if self.send_discord_signal(message):
+        if self.send_discord_message(message):
             self.log(f"📱 SELL Signal sent: {symbol} ({reason})")
             return True
         
@@ -302,7 +326,7 @@ Buy now on your exchange! 📲"""
         """Check if market is open (US Eastern time)"""
         from datetime import datetime, timezone
         
-        eastern = timezone(timedelta(hours=-4)) # EDT (daylight saving)
+        eastern = timezone(timedelta(hours=-4))
         now = datetime.now(eastern)
         
         is_weekday = now.weekday() < 5
@@ -319,9 +343,15 @@ Buy now on your exchange! 📲"""
             self.signals_today = 0
             self.last_signal_date = today
         
+        # Always send status message
+        self.log("📊 Sending status update to Discord...")
+        self.send_status_message()
+        
+        # Check sell conditions
         self.log("🔍 Checking open positions for sell signals...")
         self.check_sell_conditions()
         
+        # Find new buy signals
         signals = self.find_signals()
         
         if not signals:
@@ -346,6 +376,7 @@ Buy now on your exchange! 📲"""
         self.log(f" Stop Loss: -{self.stop_loss}%")
         self.log(f" Max Hold: {self.max_hold_days} days")
         self.log(f" Max Signals/Day: {self.max_signals_per_day}")
+        self.log(f" Status Updates: Every 30 minutes (market hours)")
         self.log("=" * 80)
         
         cycle = 0
@@ -362,7 +393,6 @@ Buy now on your exchange! 📲"""
                 else:
                     self.log("⏳ Market closed - waiting for market hours (9:30 AM - 4:00 PM EDT)")
                 
-                self.log(f"📊 Active positions: {len([p for p in self.active_positions.values() if p['status'] == 'OPEN'])}")
                 self.log(f"⏱️ Next check in 30 min...")
                 time.sleep(1800)
         
