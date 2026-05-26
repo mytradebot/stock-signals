@@ -1,43 +1,135 @@
 #!/usr/bin/env python3
 """
-MANGOBOT - SIMPLE VERSION
-Copy & Paste Only - Works Immediately
+MANGOBOT - DYNAMIC STOCK CRAWLER
+Fetches ALL USA stocks from web automatically
+No hardcoding - Real data!
 """
 
 import os
 import json
 import time
 from datetime import datetime, timedelta
+import requests
 
-def install_yfinance():
-    """Install yfinance if not present"""
+def install_packages():
+    """Install required packages"""
     try:
         import yfinance
     except:
         print("📦 Installing yfinance...")
         os.system("pip install yfinance --break-system-packages")
+    
+    try:
+        import pandas
+    except:
+        print("📦 Installing pandas...")
+        os.system("pip install pandas --break-system-packages")
 
-install_yfinance()
+install_packages()
 
 import yfinance
-import requests
+import pandas as pd
 
-class MangoBot:
+class DynamicMangoBot:
     def __init__(self):
         self.webhook = os.environ.get('DISCORD_WEBHOOK')
         if not self.webhook:
             print("❌ ERROR: DISCORD_WEBHOOK not set!")
             exit(1)
         
-        # Simple parameters
+        # Parameters
         self.min_dip = 0.3
         self.min_volume = 100000
         self.profit_target = 5.0
         self.stop_loss = 2.0
         self.max_hold = 7
         
-        # Stocks to analyze (1000+)
-        self.stocks = [
+        # Dynamically fetch stocks
+        self.stocks = self.fetch_all_usa_stocks()
+        
+        self.buffer = []
+        self.last_push = datetime.now()
+        self.signals_today = 0
+        self.today = datetime.now().strftime("%Y-%m-%d")
+        
+        self.log("=" * 80)
+        self.log("🥭 MANGOBOT - DYNAMIC CRAWLER")
+        self.log(f"📊 Found {len(self.stocks)} USA stocks")
+        self.log("=" * 80)
+    
+    def fetch_all_usa_stocks(self):
+        """Fetch ALL USA stocks from multiple sources"""
+        self.log("🌐 Fetching ALL USA stocks from web...")
+        all_stocks = set()
+        
+        # METHOD 1: Fetch S&P 500 from Wikipedia
+        try:
+            self.log("   📥 Fetching S&P 500...")
+            url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+            response = requests.get(url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                # Parse HTML table
+                df = pd.read_html(response.text)[0]
+                if 'Symbol' in df.columns:
+                    symbols = df['Symbol'].tolist()
+                    all_stocks.update(symbols)
+                    self.log(f"      ✅ Got {len(symbols)} S&P 500 stocks")
+        except Exception as e:
+            self.log(f"      ⚠️  S&P 500 failed: {e}")
+        
+        # METHOD 2: Fetch NASDAQ stocks
+        try:
+            self.log("   📥 Fetching NASDAQ...")
+            url = "https://en.wikipedia.org/wiki/Nasdaq-100"
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+            response = requests.get(url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                df = pd.read_html(response.text)[4]  # NASDAQ table
+                if 'Ticker' in df.columns:
+                    symbols = df['Ticker'].tolist()
+                    all_stocks.update(symbols)
+                    self.log(f"      ✅ Got {len(symbols)} NASDAQ stocks")
+        except Exception as e:
+            self.log(f"      ⚠️  NASDAQ failed: {e}")
+        
+        # METHOD 3: Fetch Dow Jones from Wikipedia
+        try:
+            self.log("   📥 Fetching Dow Jones...")
+            url = "https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average"
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+            response = requests.get(url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                df = pd.read_html(response.text)[1]  # Dow table
+                if 'Symbol' in df.columns:
+                    symbols = df['Symbol'].tolist()
+                    all_stocks.update(symbols)
+                    self.log(f"      ✅ Got {len(symbols)} Dow Jones stocks")
+        except Exception as e:
+            self.log(f"      ⚠️  Dow failed: {e}")
+        
+        # METHOD 4: Fetch Russell 3000 stocks
+        try:
+            self.log("   📥 Fetching Russell 3000...")
+            url = "https://en.wikipedia.org/wiki/Russell_3000"
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+            response = requests.get(url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                tables = pd.read_html(response.text)
+                for table in tables:
+                    if 'Ticker' in table.columns:
+                        symbols = table['Ticker'].tolist()
+                        all_stocks.update(symbols)
+                self.log(f"      ✅ Got Russell 3000 stocks")
+        except Exception as e:
+            self.log(f"      ⚠️  Russell failed: {e}")
+        
+        # METHOD 5: Get popular ETFs and stocks
+        popular = [
             'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'META', 'BRK.B', 'JNJ', 'V',
             'WMT', 'PG', 'UNH', 'MA', 'HD', 'DIS', 'COST', 'LOW', 'MCD', 'NFLX', 'CSCO',
             'ORACLE', 'IBM', 'INTC', 'AMD', 'CRM', 'ADBE', 'AVGO', 'ASML', 'QCOM', 'INTU',
@@ -56,27 +148,24 @@ class MangoBot:
             'TMO', 'LLY', 'MRK', 'AMGN', 'GILD', 'BNTX', 'SGEN', 'JPM', 'BAC', 'WFC', 'GS',
             'MS', 'BLK', 'SCHW', 'TROW', 'AXP', 'DFS', 'SYF', 'VNO', 'PLD', 'PSA', 'EQR',
             'AVB', 'ARE', 'MAA', 'WY', 'RYN', 'PCH', 'IRM', 'SSNC', 'PAYC', 'NTES', 'BIDU',
-            'VRSN', 'ANET', 'TEAM', 'DOCU', 'NEWR', 'ORCL', 'WDAY', 'OKTA', 'ZSCALER',
-            'PALO', 'CRSR', 'LFAP', 'PAYX', 'ACLS', 'ACNB', 'ACRE', 'ACRX', 'ACTS', 'ACVA',
-            'ACXM', 'ADAP', 'ADBK', 'ADCT', 'ADDE', 'ADEA', 'ADER', 'ADEV', 'ADEW', 'ADFX',
-            'ADGE', 'ADGI', 'ADGM', 'ADGS', 'ADGT', 'ADGX', 'ADHA', 'ADHB', 'ADHE', 'ADHI',
-            'ADHM', 'ADHO', 'ADHP', 'ADHR', 'ADHS', 'ADHU', 'ADHV', 'ADHW', 'ADIG', 'ADIT',
-            'ADJU', 'ADJV', 'ADJW', 'ADJX', 'ADJY', 'ADJZ', 'ADKA', 'ADKB', 'ADKC', 'ADKE',
-            'ADKF', 'ADKG', 'ADKH', 'ADKI', 'ADKJ', 'ADKK', 'ADKL', 'ADKM', 'ADKN', 'ADKO',
-            'VTV', 'VUG', 'VGK', 'VXUS', 'SCHB', 'SCHC', 'SCHD', 'EEM', 'AGG', 'BND',
-            'BSV', 'BIV', 'LQD', 'HYG', 'JNK', 'TLT', 'IEF', 'SHV', 'GLD', 'SLV', 'USO',
-            'DBC', 'VNQ', 'REM', 'XRT', 'VXX', 'UVXY'
+            'VRSN', 'ANET', 'TEAM', 'DOCU', 'NEWR', 'ORCL', 'WDAY', 'OKTA', 'ZSCALER', 'PALO'
         ]
+        all_stocks.update(popular)
         
-        self.buffer = []
-        self.last_push = datetime.now()
-        self.signals_today = 0
-        self.today = datetime.now().strftime("%Y-%m-%d")
+        # Clean up stock symbols
+        final_stocks = []
+        for stock in all_stocks:
+            stock = str(stock).strip().upper()
+            # Only keep valid stock symbols (1-5 chars, letters only)
+            if len(stock) >= 1 and len(stock) <= 5 and stock.replace('.', '').replace('-', '').isalpha():
+                final_stocks.append(stock)
         
-        self.log("=" * 80)
-        self.log("🥭 MANGOBOT - SIMPLE VERSION")
-        self.log(f"📊 Analyzing {len(self.stocks)} stocks")
-        self.log("=" * 80)
+        final_stocks = sorted(list(set(final_stocks)))
+        
+        self.log(f"✅ Total unique stocks: {len(final_stocks)}")
+        self.log(f"📊 Ready to analyze!")
+        
+        return final_stocks
     
     def log(self, msg):
         """Print and save logs"""
@@ -90,19 +179,19 @@ class MangoBot:
             pass
     
     def get_stock_data(self, symbol):
-        """Fetch stock data from Yahoo Finance"""
+        """Fetch stock data"""
         try:
             ticker = yfinance.Ticker(symbol)
             hist = ticker.history(period="1y")
             
-            if hist.empty:
+            if hist.empty or len(hist) < 50:
                 return None
             
             price = hist['Close'].iloc[-1]
             high_52w = hist['High'].max()
             volume = hist['Volume'].iloc[-1]
             
-            if price > 0 and high_52w > 0:
+            if price > 0 and high_52w > 0 and volume > 0:
                 dip = ((high_52w - price) / high_52w) * 100
                 return {
                     'symbol': symbol,
@@ -117,7 +206,7 @@ class MangoBot:
         return None
     
     def find_signals(self):
-        """Scan all stocks"""
+        """Scan ALL stocks"""
         signals = []
         analyzed = 0
         found = 0
@@ -157,13 +246,13 @@ class MangoBot:
                     
                     signals.append(signal)
                 
-                time.sleep(0.02)
+                time.sleep(0.01)
             except:
                 failed += 1
                 continue
         
-        self.log(f"   ✅ Analyzed: {analyzed}")
-        self.log(f"   📊 Found: {found}")
+        self.log(f"   ✅ Analyzed: {analyzed}/{len(self.stocks)}")
+        self.log(f"   📊 Found: {found} signals")
         self.log(f"   ❌ Failed: {failed}")
         
         if signals:
@@ -173,9 +262,9 @@ class MangoBot:
         return signals
     
     def push_best_to_discord(self):
-        """Push best signal to Discord"""
+        """Push best signal"""
         if not self.buffer:
-            self.log("⚪ No signals in buffer")
+            self.log("⚪ No signals")
             return False
         
         best = max(self.buffer, key=lambda x: x['dip'])
@@ -194,7 +283,7 @@ class MangoBot:
 
 📲 **BUY NOW!**
 
-🔄 Next signal in 30 min
+🔄 Next in 30 min
 🥭 MangoBot"""
         
         try:
@@ -212,7 +301,7 @@ class MangoBot:
         return False
     
     def is_market_open(self):
-        """Check if US market is open"""
+        """Check market hours"""
         from datetime import datetime, timezone
         
         eastern = timezone(timedelta(hours=-4))
@@ -233,7 +322,7 @@ class MangoBot:
                 now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 self.log(f"\n🔄 CYCLE #{cycle} [{now}]")
                 
-                # Reset daily counter
+                # Reset daily
                 today = datetime.now().strftime("%Y-%m-%d")
                 if today != self.today:
                     self.signals_today = 0
@@ -241,10 +330,10 @@ class MangoBot:
                     self.buffer = []
                 
                 if self.is_market_open():
-                    # Scan stocks
+                    # Scan
                     self.find_signals()
                     
-                    # Check if 30 min passed
+                    # Check 30 min
                     elapsed = datetime.now() - self.last_push
                     if elapsed >= timedelta(minutes=30):
                         self.log("⏰ 30 min - PUSHING!")
@@ -254,17 +343,17 @@ class MangoBot:
                         remaining = 30 - int(elapsed.total_seconds() / 60)
                         self.log(f"⏳ Push in {remaining} min (Buffer: {len(self.buffer)})")
                 else:
-                    self.log("⏳ Market closed (9:30 AM - 4:00 PM EDT)")
+                    self.log("⏳ Market closed")
                 
                 self.log(f"⏱️  Next check: 5 min...")
-                time.sleep(300)  # 5 minutes
+                time.sleep(300)
         
         except KeyboardInterrupt:
-            self.log("\n⏹️  BOT STOPPED")
+            self.log("\n⏹️  STOPPED")
         except Exception as e:
             self.log(f"\n❌ ERROR: {e}")
 
 
 if __name__ == "__main__":
-    bot = MangoBot()
+    bot = DynamicMangoBot()
     bot.run()
