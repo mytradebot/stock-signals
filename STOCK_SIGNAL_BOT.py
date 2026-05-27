@@ -34,10 +34,10 @@ class MomentumVolumeBot:
         # YOUR REAL FINNHUB API KEY
         self.finnhub_key = 'd8bja4hr01qppd8s0760d8bja4hr01qppd8s076g'
         
-        # MOMENTUM + VOLUME CRITERIA - OPTIMAL FOR PROFITS
-        self.min_momentum = 0.5   # Stock jumped UP at least 0.5%
-        self.max_momentum = 3.5   # But not too much (already run up)
-        self.min_volume = 500000  # Must be liquid
+        # MOMENTUM + VOLUME CRITERIA - LOOSENED FOR SIGNAL FLOW
+        self.min_momentum = 0.3   # Stock jumped UP at least 0.3%
+        self.max_momentum = 5.0   # Up to 5%
+        self.min_volume = 300000  # Lower volume threshold
         
         # Profit targets for 2-7 day holds
         self.profit_target = {2: 1.5, 3: 1.9, 4: 2.9, 5: 0.9, 6: 3.2, 7: 2.5}
@@ -59,8 +59,8 @@ class MomentumVolumeBot:
         self.log("=" * 80)
         self.log("🥭 MEGA BOT - MOMENTUM + VOLUME VERSION")
         self.log("📊 500 REAL STOCKS (S&P 500 + NASDAQ + ETFs)")
-        self.log("🚀 Strategy: Find stocks UP 0.5-3.5% + High Volume")
-        self.log("⏰ Perfect for 2-7 day trades!")
+        self.log("🚀 Strategy: Find stocks UP 0.3-5% in LAST 5-7 DAYS + 300k Volume")
+        self.log("⏰ SIGNAL FLOW MODE - Loosened for maximum opportunities!")
         self.log("=" * 80)
     
     def get_300_stocks(self):
@@ -134,7 +134,7 @@ class MomentumVolumeBot:
             pass
     
     def get_stock_data_finnhub(self, symbol):
-        """Get stock data from Finnhub (current + previous close for momentum)"""
+        """Get stock data from Finnhub (5-7 day momentum for best profits)"""
         try:
             url = f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={self.finnhub_key}"
             response = requests.get(url, timeout=5)
@@ -142,18 +142,24 @@ class MomentumVolumeBot:
             
             if 'c' in data and data['c'] > 0:
                 current_price = data['c']
+                # Get price from ~7 days ago
+                price_7days_ago = data.get('o', current_price)  # open = approximate start of week
                 previous_close = data.get('pc', current_price)  # previous close
                 volume = data.get('v', 0)
                 
-                if previous_close > 0 and volume > 0:
-                    # Calculate momentum (% change from previous close)
-                    momentum = ((current_price - previous_close) / previous_close) * 100
+                # Calculate 5-7 day momentum (better for swing trades)
+                if price_7days_ago > 0 and volume > 0:
+                    momentum_7day = ((current_price - price_7days_ago) / price_7days_ago) * 100
+                    
+                    # If 7-day not available, use previous close
+                    if momentum_7day < 0.1:
+                        momentum_7day = ((current_price - previous_close) / previous_close) * 100
                     
                     return {
                         'symbol': symbol,
                         'current_price': round(current_price, 2),
-                        'previous_close': round(previous_close, 2),
-                        'momentum': round(momentum, 2),  # % change
+                        'price_7days_ago': round(price_7days_ago, 2),
+                        'momentum': round(momentum_7day, 2),  # 5-7 day momentum
                         'volume': int(volume),
                         'source': 'Finnhub'
                     }
@@ -227,8 +233,8 @@ class MomentumVolumeBot:
             return 0
     
     def scan_stocks(self):
-        """Scan all 500 stocks for MOMENTUM + VOLUME (0.5-3.5%)"""
-        self.log(f"🚀 Scanning {len(self.stocks)} stocks for MOMENTUM + VOLUME (0.5-3.5%)...")
+        """Scan all 500 stocks for 5-7 DAY MOMENTUM + VOLUME (0.3-5%)"""
+        self.log(f"🚀 Scanning {len(self.stocks)} stocks for 5-7 DAY MOMENTUM (0.3-5%)...")
         
         analyzed = 0
         found = 0
@@ -249,7 +255,7 @@ class MomentumVolumeBot:
                     found += 1
                     score = self.calculate_momentum_score(symbol, data)
                     
-                    if score >= 50:  # Quality signals
+                    if score >= 40:  # Lower threshold for signal flow
                         self.memory['top_scores'][symbol] = {
                             'score': score,
                             'current_price': data['current_price'],
