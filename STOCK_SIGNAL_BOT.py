@@ -134,33 +134,22 @@ class MomentumVolumeBot:
             pass
     
     def get_stock_data_finnhub(self, symbol):
-        """Get stock data from Finnhub (5-7 day momentum for best profits)"""
+        """Get stock data from Finnhub - SIMPLE: just price + volume"""
         try:
             url = f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={self.finnhub_key}"
             response = requests.get(url, timeout=5)
             data = response.json()
             
-            if 'c' in data and data['c'] > 0:
-                current_price = data['c']
-                # Get price from ~7 days ago
-                price_7days_ago = data.get('o', current_price)  # open = approximate start of week
-                previous_close = data.get('pc', current_price)  # previous close
-                volume = data.get('v', 0)
+            # Simple: just get current price and volume
+            if 'c' in data and data['c'] > 0 and 'v' in data:
+                current_price = float(data['c'])
+                volume = int(data.get('v', 0))
                 
-                # Calculate 5-7 day momentum (better for swing trades)
-                if price_7days_ago > 0 and volume > 0:
-                    momentum_7day = ((current_price - price_7days_ago) / price_7days_ago) * 100
-                    
-                    # If 7-day not available, use previous close
-                    if momentum_7day < 0.1:
-                        momentum_7day = ((current_price - previous_close) / previous_close) * 100
-                    
+                if current_price > 0 and volume > 0:
                     return {
                         'symbol': symbol,
                         'current_price': round(current_price, 2),
-                        'price_7days_ago': round(price_7days_ago, 2),
-                        'momentum': round(momentum_7day, 2),  # 5-7 day momentum
-                        'volume': int(volume),
+                        'volume': volume,
                         'source': 'Finnhub'
                     }
         except:
