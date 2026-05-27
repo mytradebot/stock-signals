@@ -35,8 +35,8 @@ class MomentumVolumeBot:
         self.finnhub_key = 'd8bja4hr01qppd8s0760d8bja4hr01qppd8s076g'
         
         # MOMENTUM + VOLUME CRITERIA
-        self.min_momentum = 2.0  # Stock jumped UP at least 2%
-        self.max_momentum = 5.0  # But not too much (already run up)
+        self.min_momentum = 1.0  # Stock jumped UP at least 1%
+        self.max_momentum = 4.0  # But not too much (already run up)
         self.min_volume = 500000  # Must be liquid
         
         # Profit targets for 2-7 day holds
@@ -229,12 +229,12 @@ class MomentumVolumeBot:
                 momentum = data['momentum']
                 volume = data['volume']
                 
-                # Filter: UP 2-5% AND High Volume
+                # Filter: UP 1-4% AND High Volume
                 if self.min_momentum <= momentum <= self.max_momentum and volume >= self.min_volume:
                     found += 1
                     score = self.calculate_momentum_score(symbol, data)
                     
-                    if score >= 60:  # Only quality signals
+                    if score >= 50:  # Quality signals (lowered for more trades)
                         self.memory['top_scores'][symbol] = {
                             'score': score,
                             'current_price': data['current_price'],
