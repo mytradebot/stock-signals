@@ -34,10 +34,10 @@ class MomentumVolumeBot:
         # YOUR REAL FINNHUB API KEY
         self.finnhub_key = 'd8bja4hr01qppd8s0760d8bja4hr01qppd8s076g'
         
-        # MOMENTUM + VOLUME CRITERIA - SUPER LOOSE FOR SIGNAL CAPTURE
-        self.min_momentum = 0.1   # Any movement UP 0.1%+
-        self.max_momentum = 10.0  # Up to 10%
-        self.min_volume = 100000  # Very loose volume
+        # VOLUME-BASED CRITERIA (Momentum broken, so use volume)
+        self.min_volume = 500000   # High volume = ready to trade!
+        self.min_price = 5.0       # Not penny stocks
+        self.max_price = 1000.0    # Not insanely expensive
         
         # Profit targets for 2-7 day holds
         self.profit_target = {2: 1.5, 3: 1.9, 4: 2.9, 5: 0.9, 6: 3.2, 7: 2.5}
@@ -57,10 +57,10 @@ class MomentumVolumeBot:
         self.last_30min_push = datetime.now()
         
         self.log("=" * 80)
-        self.log("🥭 MEGA BOT - MOMENTUM + VOLUME VERSION")
+        self.log("🥭 MEGA BOT - VOLUME + PRICE STRATEGY")
         self.log("📊 500 REAL STOCKS (S&P 500 + NASDAQ + ETFs)")
-        self.log("🚀 Strategy: Find stocks UP 0.1-10% + 100k Volume")
-        self.log("⏰ SUPER LOOSE MODE - Catch ALL signals NOW!")
+        self.log("🚀 Strategy: Find HIGH VOLUME stocks ready to trade!")
+        self.log("⏰ Volume 500k+ = Liquid, ready for 2-7 day swings!")
         self.log("=" * 80)
     
     def get_300_stocks(self):
@@ -233,8 +233,8 @@ class MomentumVolumeBot:
             return 0
     
     def scan_stocks(self):
-        """Scan all 500 stocks for ANY MOMENTUM (0.1-10%)"""
-        self.log(f"🚀 Scanning {len(self.stocks)} stocks for ANY MOMENTUM (0.1-10%)...")
+        """Scan all 500 stocks for HIGH VOLUME (ready to trade!)"""
+        self.log(f"🚀 Scanning {len(self.stocks)} stocks for HIGH VOLUME + GOOD PRICE...")
         
         analyzed = 0
         found = 0
@@ -247,19 +247,18 @@ class MomentumVolumeBot:
                 if not data:
                     continue
                 
-                momentum = data['momentum']
                 volume = data['volume']
+                price = data['current_price']
                 
-                # Filter: UP 0.5-3.5% AND High Volume
-                if self.min_momentum <= momentum <= self.max_momentum and volume >= self.min_volume:
+                # Filter: HIGH VOLUME + GOOD PRICE (forget momentum!)
+                if volume >= self.min_volume and self.min_price <= price <= self.max_price:
                     found += 1
                     score = self.calculate_momentum_score(symbol, data)
                     
-                    if score >= 30:  # Super loose threshold for signal capture
+                    if score >= 30:  # Super loose threshold
                         self.memory['top_scores'][symbol] = {
                             'score': score,
-                            'current_price': data['current_price'],
-                            'momentum': momentum,
+                            'current_price': price,
                             'volume': volume,
                             'source': data['source']
                         }
@@ -269,7 +268,7 @@ class MomentumVolumeBot:
             except:
                 continue
         
-        self.log(f"   ✅ Analyzed: {analyzed} | Found: {found} momentum plays")
+        self.log(f"   ✅ Analyzed: {analyzed} | Found: {found} HIGH VOLUME plays")
     
     def send_buy_signals(self):
         """Send buy signals every 30 min - AT LEAST 1 or say nothing available"""
