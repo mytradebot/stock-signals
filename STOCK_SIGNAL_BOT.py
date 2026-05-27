@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-MEGA BOT - FINNHUB FINAL
-300 REAL STOCKS - YOUR API KEY
-Auto-install all packages
-Zero errors guaranteed
+MEGA BOT - MOMENTUM + VOLUME VERSION
+Find stocks jumping UP 2-5% with high volume
+Perfect for 2-7 day swing trades
+Your exact strategy!
 """
 
 import os
@@ -24,7 +24,7 @@ except:
     os.system("pip install beautifulsoup4 --break-system-packages")
     from bs4 import BeautifulSoup
 
-class FinnhubMegaBot:
+class MomentumVolumeBot:
     def __init__(self):
         self.webhook = os.environ.get('DISCORD_WEBHOOK')
         if not self.webhook:
@@ -34,9 +34,12 @@ class FinnhubMegaBot:
         # YOUR REAL FINNHUB API KEY
         self.finnhub_key = 'd8bja4hr01qppd8s0760d8bja4hr01qppd8s076g'
         
-        # Settings
-        self.min_dip = 1.5
-        self.min_volume = 500000
+        # MOMENTUM + VOLUME CRITERIA
+        self.min_momentum = 2.0  # Stock jumped UP at least 2%
+        self.max_momentum = 5.0  # But not too much (already run up)
+        self.min_volume = 500000  # Must be liquid
+        
+        # Profit targets for 2-7 day holds
         self.profit_target = {2: 1.5, 3: 1.9, 4: 2.9, 5: 0.9, 6: 3.2, 7: 2.5}
         self.stop_loss = {2: 0.8, 3: 1.0, 4: 1.2, 5: 0.7, 6: 1.5, 7: 1.0}
         
@@ -54,10 +57,10 @@ class FinnhubMegaBot:
         self.last_30min_push = datetime.now()
         
         self.log("=" * 80)
-        self.log("🥭 MEGA BOT - FINNHUB FINAL VERSION")
+        self.log("🥭 MEGA BOT - MOMENTUM + VOLUME VERSION")
         self.log("📊 300 REAL STOCKS")
-        self.log("🔑 Finnhub API: ACTIVE ✅")
-        self.log("⏰ Every 5 min: Scan | Every 30 min: Signal")
+        self.log("🚀 Strategy: Find stocks UP 2-5% + High Volume")
+        self.log("⏰ Perfect for 2-7 day trades!")
         self.log("=" * 80)
     
     def get_300_stocks(self):
@@ -115,117 +118,92 @@ class FinnhubMegaBot:
         except:
             pass
     
-    def get_price_finnhub(self, symbol):
-        """Get price from Finnhub (PRIMARY)"""
+    def get_stock_data_finnhub(self, symbol):
+        """Get stock data from Finnhub (current + previous close for momentum)"""
         try:
             url = f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={self.finnhub_key}"
             response = requests.get(url, timeout=5)
             data = response.json()
             
-            if 'c' in data and data['c'] > 0 and 'v' in data and data['v'] > 0:
-                return {
-                    'symbol': symbol,
-                    'price': round(data['c'], 2),
-                    'high_52w': round(data.get('h52', data['c']), 2),
-                    'volume': int(data.get('v', 0)),
-                    'source': 'Finnhub'
-                }
-        except:
-            pass
-        
-        return None
-    
-    def get_price_web_scrape(self, symbol):
-        """Web scrape Yahoo Finance as backup (SILENT on failure)"""
-        try:
-            url = f"https://finance.yahoo.com/quote/{symbol}"
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-            response = requests.get(url, headers=headers, timeout=5)
-            
-            if response.status_code == 200:
-                soup = BeautifulSoup(response.content, 'html.parser')
+            if 'c' in data and data['c'] > 0:
+                current_price = data['c']
+                previous_close = data.get('pc', current_price)  # previous close
+                volume = data.get('v', 0)
                 
-                # Try to find price
-                price_elem = soup.find('fin-streamer', {'data-symbol': symbol, 'data-field': 'regularMarketPrice'})
-                if price_elem:
-                    price = float(price_elem.text)
-                    
-                    # Try to find 52-week high
-                    high_elem = soup.find('td', string='52 Week High')
-                    high_52w = price
-                    if high_elem:
-                        try:
-                            high_52w = float(high_elem.find_next('td').text.replace(',', ''))
-                        except:
-                            pass
+                if previous_close > 0 and volume > 0:
+                    # Calculate momentum (% change from previous close)
+                    momentum = ((current_price - previous_close) / previous_close) * 100
                     
                     return {
                         'symbol': symbol,
-                        'price': round(price, 2),
-                        'high_52w': round(high_52w, 2),
-                        'volume': 1000000,
-                        'source': 'WebScrape'
+                        'current_price': round(current_price, 2),
+                        'previous_close': round(previous_close, 2),
+                        'momentum': round(momentum, 2),  # % change
+                        'volume': int(volume),
+                        'source': 'Finnhub'
                     }
         except:
             pass
         
         return None
     
-    def get_stock_price(self, symbol):
-        """Hybrid: Finnhub → Web Scrape (SILENT on failure)"""
+    def get_stock_data(self, symbol):
+        """Get stock data (PRIMARY: Finnhub)"""
         
-        # Try 1: Finnhub
-        data = self.get_price_finnhub(symbol)
+        # Try Finnhub
+        data = self.get_stock_data_finnhub(symbol)
         if data:
             return data
         
-        # Try 2: Web Scrape
-        data = self.get_price_web_scrape(symbol)
-        if data:
-            return data
-        
-        # Silent skip (NO ERROR)
+        # Silent skip on failure
         return None
     
-    def calculate_score(self, symbol, data):
-        """Calculate quality score (0-100)"""
+    def calculate_momentum_score(self, symbol, data):
+        """Calculate score based on MOMENTUM + VOLUME"""
         try:
             if not data:
                 return 0
             
             score = 0
-            dip = ((data['high_52w'] - data['price']) / data['high_52w']) * 100
+            momentum = data['momentum']
             volume = data['volume']
-            price = data['price']
             
-            # Dip score
-            if 1.5 <= dip <= 5:
-                score += 25
-            elif 0.8 <= dip < 1.5:
-                score += 15
-            elif dip > 5:
-                score += 10
+            # MOMENTUM SCORE (0-40 points)
+            # Sweet spot: 2-5% gain
+            if 2.0 <= momentum <= 5.0:
+                score += 40
+            elif 1.5 <= momentum < 2.0:
+                score += 30
+            elif 5.0 < momentum <= 7.0:
+                score += 35
+            elif momentum > 7.0:
+                score += 20  # Too much already run up
+            elif momentum < 1.5:
+                score += 0  # Not enough momentum
             
-            # Volume score
-            if volume > 10000000:
-                score += 25
+            # VOLUME SCORE (0-40 points)
+            if volume > 50000000:
+                score += 40
+            elif volume > 20000000:
+                score += 38
+            elif volume > 10000000:
+                score += 36
             elif volume > 5000000:
-                score += 20
+                score += 34
+            elif volume > 2000000:
+                score += 32
             elif volume > 1000000:
-                score += 15
-            
-            # Price score
-            if 50 < price < 300:
+                score += 30
+            elif volume > 500000:
                 score += 25
-            elif 20 < price <= 50 or 300 <= price < 500:
+            else:
+                score += 0
+            
+            # PRICE STABILITY BONUS (0-20 points)
+            price = data['current_price']
+            if 20 < price < 500:
                 score += 15
             elif price > 500:
-                score += 10
-            
-            # Bonus
-            if data['source'] == 'Finnhub':
                 score += 10
             
             return min(score, 100)
@@ -234,81 +212,83 @@ class FinnhubMegaBot:
             return 0
     
     def scan_stocks(self):
-        """Scan all 300 stocks (SILENT on failures)"""
-        self.log(f"🔍 Scanning {len(self.stocks)} stocks via Finnhub...")
+        """Scan all 300 stocks for MOMENTUM + VOLUME"""
+        self.log(f"🚀 Scanning {len(self.stocks)} stocks for MOMENTUM + VOLUME...")
         
         analyzed = 0
         found = 0
         
         for symbol in self.stocks:
             try:
-                data = self.get_stock_price(symbol)
+                data = self.get_stock_data(symbol)
                 analyzed += 1
                 
                 if not data:
                     continue
                 
-                dip = ((data['high_52w'] - data['price']) / data['high_52w']) * 100
+                momentum = data['momentum']
+                volume = data['volume']
                 
-                if dip >= self.min_dip and data['volume'] >= self.min_volume:
+                # Filter: UP 2-5% AND High Volume
+                if self.min_momentum <= momentum <= self.max_momentum and volume >= self.min_volume:
                     found += 1
-                    score = self.calculate_score(symbol, data)
+                    score = self.calculate_momentum_score(symbol, data)
                     
-                    self.memory['top_scores'][symbol] = {
-                        'score': score,
-                        'price': data['price'],
-                        'dip': round(dip, 2),
-                        'source': data['source'],
-                        'volume': data['volume']
-                    }
+                    if score >= 60:  # Only quality signals
+                        self.memory['top_scores'][symbol] = {
+                            'score': score,
+                            'current_price': data['current_price'],
+                            'momentum': momentum,
+                            'volume': volume,
+                            'source': data['source']
+                        }
                 
                 time.sleep(0.02)
             
             except:
                 continue
         
-        self.log(f"   ✅ Analyzed: {analyzed} | Found: {found}")
+        self.log(f"   ✅ Analyzed: {analyzed} | Found: {found} momentum plays")
     
     def send_buy_signals(self):
-        """Send buy signals every 30 min"""
-        if not self.memory['top_scores']:
-            self.log("⚪ No signals found")
-            return
+        """Send buy signals every 30 min - AT LEAST 1 or say nothing available"""
         
+        # Get all scores
         sorted_stocks = sorted(
             self.memory['top_scores'].items(),
             key=lambda x: x[1]['score'],
             reverse=True
-        )
+        ) if self.memory['top_scores'] else []
         
-        selected = sorted_stocks[:6]
         timeframes = [2, 3, 4, 5, 6, 7]
-        
-        message = "🥭 **MEGA BOT SIGNALS** (30-min batch)\n"
+        signal_count = 0
+        message = "🥭 **MEGA BOT - 30 MIN UPDATE**\n"
         message += f"⏰ {datetime.now().strftime('%H:%M %Z')}\n\n"
         
-        signal_count = 0
-        for i, (symbol, info) in enumerate(selected):
+        # Try to send at least 1 signal
+        for i, (symbol, info) in enumerate(sorted_stocks):
             if i >= len(timeframes):
                 break
             
-            timeframe = timeframes[i]
-            
+            # Skip if blocked
             if self.is_stock_blocked(symbol):
                 continue
             
+            timeframe = timeframes[i]
             score = info['score']
-            price = info['price']
-            dip = info['dip']
-            source = info['source']
+            price = info['current_price']
+            momentum = info['momentum']
+            volume = info['volume']
             
             target = price * (1 + self.profit_target[timeframe] / 100)
             stop = price * (1 - self.stop_loss[timeframe] / 100)
             
-            message += f"**{timeframe}-DAY: {symbol}** ({source})\n"
-            message += f"Entry: ${price:.2f} | Dip: {dip:.2f}%\n"
-            message += f"Target: ${target:.2f} | Stop: ${stop:.2f}\n"
-            message += f"Score: {score}/100\n\n"
+            message += f"🟢 **BUY: {symbol}** ({timeframe}-day hold)\n"
+            message += f"Entry: ${price:.2f}\n"
+            message += f"Momentum: +{momentum:.2f}% | Volume: {volume/1000000:.1f}M\n"
+            message += f"Target: ${target:.2f} (+{self.profit_target[timeframe]}%)\n"
+            message += f"Stop: ${stop:.2f} (cut loss)\n"
+            message += f"Quality: {score}/100\n\n"
             
             self.memory['open_positions'][f"{symbol}_{timeframe}"] = {
                 'symbol': symbol,
@@ -322,13 +302,29 @@ class FinnhubMegaBot:
             
             self.block_stock(symbol)
             signal_count += 1
+            
+            # Send at least 1, can send up to 6
+            if signal_count >= 6:
+                break
         
-        if signal_count > 0:
-            try:
-                requests.post(self.webhook, json={'content': message}, timeout=10)
+        # If no signals found, tell the user clearly
+        if signal_count == 0:
+            message = "⚪ **MEGA BOT - 30 MIN UPDATE**\n"
+            message += f"⏰ {datetime.now().strftime('%H:%M %Z')}\n\n"
+            message += "❌ **NO SIGNALS RIGHT NOW**\n"
+            message += "No momentum stocks available to buy at this moment.\n"
+            message += "Keep waiting - next scan in 5 minutes! 🔍\n"
+            message += "(Market may be slow or no stocks meet criteria)\n"
+        
+        # Always send message
+        try:
+            requests.post(self.webhook, json={'content': message}, timeout=10)
+            if signal_count > 0:
                 self.log(f"📱 Sent {signal_count} signals to Discord")
-            except:
-                self.log("⚠️ Discord issue")
+            else:
+                self.log(f"📱 Sent 'No signals' message to Discord")
+        except:
+            self.log("⚠️ Discord issue")
         
         self.memory['top_scores'] = {}
     
@@ -346,11 +342,11 @@ class FinnhubMegaBot:
             symbol = pos['symbol']
             
             try:
-                data = self.get_stock_price(symbol)
+                data = self.get_stock_data(symbol)
                 if not data:
                     continue
                 
-                current = data['price']
+                current = data['current_price']
                 entry = pos['entry_price']
                 target = pos['target']
                 stop = pos['stop']
@@ -359,7 +355,7 @@ class FinnhubMegaBot:
                 profit_pct = ((current - entry) / entry) * 100
                 
                 if current >= target:
-                    msg = f"🟢 SELL - TARGET!\n{symbol} | ${entry:.2f} → ${current:.2f} | +{profit_pct:.2f}% | {timeframe}d"
+                    msg = f"🟢 SELL - TARGET HIT!\n{symbol} | ${entry:.2f} → ${current:.2f} | +{profit_pct:.2f}% | {timeframe}d"
                     try:
                         requests.post(self.webhook, json={'content': msg}, timeout=10)
                     except:
@@ -369,7 +365,7 @@ class FinnhubMegaBot:
                     self.memory['daily_trades'].append(pos)
                 
                 elif current <= stop:
-                    msg = f"🔴 SELL - STOP!\n{symbol} | ${entry:.2f} → ${current:.2f} | {profit_pct:.2f}% | {timeframe}d"
+                    msg = f"🔴 SELL - STOP LOSS!\n{symbol} | ${entry:.2f} → ${current:.2f} | {profit_pct:.2f}% | {timeframe}d"
                     try:
                         requests.post(self.webhook, json={'content': msg}, timeout=10)
                     except:
@@ -383,7 +379,7 @@ class FinnhubMegaBot:
                     days_held = (datetime.now() - entry_time).days
                     
                     if days_held >= timeframe:
-                        msg = f"🟡 SELL - TIME!\n{symbol} | ${entry:.2f} → ${current:.2f} | {profit_pct:+.2f}% | {timeframe}d"
+                        msg = f"🟡 SELL - TIMEFRAME EXPIRED!\n{symbol} | ${entry:.2f} → ${current:.2f} | {profit_pct:+.2f}% | {timeframe}d"
                         try:
                             requests.post(self.webhook, json={'content': msg}, timeout=10)
                         except:
@@ -422,7 +418,7 @@ class FinnhubMegaBot:
         neutral = len([t for t in trades if t.get('result') == 'NEUTRAL'])
         win_rate = (won / len(trades) * 100) if trades else 0
         
-        msg = f"📊 SUMMARY\nTotal: {len(trades)} | Won: {won} ✅ | Lost: {lost} ❌ | Neutral: {neutral} ⏰\nWin: {win_rate:.1f}%"
+        msg = f"📊 DAILY SUMMARY\nTotal: {len(trades)} | Won: {won} ✅ | Lost: {lost} ❌ | Neutral: {neutral} ⏰\nWin Rate: {win_rate:.1f}%"
         
         try:
             requests.post(self.webhook, json={'content': msg}, timeout=10)
@@ -454,12 +450,12 @@ class FinnhubMegaBot:
                 
                 elapsed = datetime.now() - self.last_30min_push
                 if elapsed >= timedelta(minutes=30):
-                    self.log("⏰ 30 min - SIGNALS!")
+                    self.log("⏰ 30 min - SENDING MOMENTUM SIGNALS!")
                     self.send_buy_signals()
                     self.last_30min_push = datetime.now()
                 else:
                     remaining = 30 - int(elapsed.total_seconds() / 60)
-                    self.log(f"⏳ Next in {remaining} min")
+                    self.log(f"⏳ Next signal in {remaining} min")
             
             else:
                 self.log("⏳ Market closed")
@@ -469,5 +465,5 @@ class FinnhubMegaBot:
 
 
 if __name__ == "__main__":
-    bot = FinnhubMegaBot()
+    bot = MomentumVolumeBot()
     bot.run()
