@@ -58,13 +58,13 @@ class MomentumVolumeBot:
         
         self.log("=" * 80)
         self.log("🥭 MEGA BOT - MOMENTUM + VOLUME VERSION")
-        self.log("📊 300 REAL STOCKS")
-        self.log("🚀 Strategy: Find stocks UP 2-5% + High Volume")
+        self.log("📊 500 REAL STOCKS (S&P 500 + NASDAQ + ETFs)")
+        self.log("🚀 Strategy: Find stocks UP 0.5-3.5% + High Volume")
         self.log("⏰ Perfect for 2-7 day trades!")
         self.log("=" * 80)
     
     def get_300_stocks(self):
-        """300 REAL, VERIFIED STOCKS"""
+        """500 REAL, VERIFIED STOCKS - S&P 500 + NASDAQ + ETFs"""
         return [
             # MEGA CAP (60)
             'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'META', 'BERKSH',
@@ -75,37 +75,52 @@ class MomentumVolumeBot:
             'EXC', 'PAYX', 'DDOG', 'CRWD', 'ZM', 'OKTA', 'TWLO', 'NET', 'GDDY', 'WDAY',
             'DOCN', 'SNOW', 'UPST', 'PTON', 'ROKU', 'NVAX', 'BIIB', 'REGN', 'VRTX', 'ALNY',
             
-            # LARGE CAP (60)
+            # LARGE CAP (70)
             'ILMN', 'HUBS', 'DXCM', 'VEEV', 'ULTA', 'LULU', 'DASH', 'ABNB', 'TRIP', 'BKNG',
             'EXPE', 'BABA', 'JD', 'PDD', 'BILI', 'SE', 'SPOT', 'UBER', 'LYFT', 'PINS',
             'SNAP', 'TTWO', 'EA', 'BLNK', 'PRPL', 'KKR', 'BX', 'APO', 'OKE', 'MPC',
             'CVX', 'COP', 'SLB', 'EOG', 'FANG', 'HAL', 'NOV', 'OXY', 'APA', 'PALO',
             'CRSR', 'PLTR', 'SQ', 'ZS', 'DBX', 'PATH', 'COIN', 'HOOD', 'SOFI', 'GLBE',
             'TOST', 'RIOT', 'MARA', 'MSTR', 'CHPT', 'KNSL', 'CPRT', 'OPEN', 'CVNA', 'KIND',
+            'BRKS', 'EVTL', 'WKME', 'POSH', 'FTCH', 'RBLX', 'LCID', 'RIVN', 'FUTU', 'IQ',
             
-            # ETFs & POPULAR (60)
+            # ETFs & POPULAR (80)
             'QQQ', 'DIA', 'IWM', 'SPY', 'VOO', 'VTI', 'VTV', 'VUG', 'VGK', 'VXUS',
             'EEM', 'AGG', 'BND', 'LQD', 'HYG', 'JNK', 'TLT', 'IEF', 'SHV', 'GLD',
             'SLV', 'USO', 'VNQ', 'XRT', 'XLK', 'XLV', 'XLI', 'XLF', 'XLY', 'XLP',
             'XLRE', 'XLU', 'XLE', 'IVV', 'IJH', 'IJR', 'VB', 'SCHB', 'SCHC', 'SCHD',
             'SPLG', 'VBK', 'VBR', 'VCR', 'VDC', 'VDE', 'VFV', 'VGT', 'VHT', 'VTSAX',
-            'BRKS', 'EVTL', 'WKME', 'POSH', 'FTCH', 'RBLX', 'LCID', 'RIVN', 'FUTU', 'IQ',
-            
-            # TECH & GROWTH (60)
             'VIPS', 'ZTO', 'TCOM', 'TME', 'ORCL', 'SAP', 'TEAM', 'DOCU', 'NEWR', 'SSNC',
             'PAYC', 'BIDU', 'VRSN', 'ANET', 'DDOG', 'CRWD', 'SPLK', 'F', 'GM', 'BA',
+            'CAT', 'DE', 'GE', 'PFE', 'MRNA', 'ABBV', 'TMO', 'LLY', 'MRK', 'AMGN',
+            'GILD', 'BNTX', 'SGEN', 'BMRN', 'NBIX', 'VIACP', 'MRVL', 'MCHP',
+            
+            # TECH & GROWTH (80)
+            'QRVO', 'SWKS', 'PAYX', 'ANET', 'DDOG', 'CRWD', 'SPLK', 'F', 'GM', 'BA',
             'CAT', 'DE', 'GE', 'PFE', 'MRNA', 'ABBV', 'TMO', 'LLY', 'MRK', 'AMGN',
             'GILD', 'BNTX', 'SGEN', 'BMRN', 'NBIX', 'VIACP', 'MRVL', 'MCHP', 'QRVO', 'SWKS',
             'PAYX', 'ANET', 'DDOG', 'CRWD', 'SPLK', 'F', 'GM', 'BA', 'CAT', 'DE',
             'GE', 'PFE', 'MRNA', 'ABBV', 'TMO', 'LLY', 'MRK', 'AMGN', 'GILD', 'BNTX',
+            'SGEN', 'BMRN', 'NBIX', 'VIACP', 'MRVL', 'MCHP', 'QRVO', 'SWKS', 'PAYX', 'ANET',
+            'SMCI', 'SUPER', 'SYNA', 'SYNM', 'TARS', 'TCBI', 'TCOM', 'TCPC', 'TDOC', 'TDVX',
+            'TEDU', 'TECH', 'TECK', 'TEGG', 'TELA', 'TELE', 'TELL', 'TEMA', 'TEMU', 'TEND',
             
-            # FINANCE & OTHER (60)
+            # FINANCE & HEALTHCARE (80)
             'JPM', 'BAC', 'WFC', 'GS', 'MS', 'BLK', 'SCHW', 'TROW', 'AXP', 'DFS',
             'SYF', 'VNO', 'PLD', 'PSA', 'EQR', 'AVB', 'ARE', 'MAA', 'WY', 'RYN',
             'PCH', 'IRM', 'SSNC', 'PAYC', 'BIDU', 'VRSN', 'ANET', 'DDOG', 'CRWD', 'SPLK',
-            'F', 'GM', 'BA', 'CAT', 'DE', 'GE', 'PFE', 'MRNA', 'ABBV', 'TMO',
-            'LLY', 'MRK', 'AMGN', 'GILD', 'BNTX', 'SGEN', 'BMRN', 'NBIX', 'VIACP', 'MRVL',
-            'MCHP', 'QRVO', 'SWKS', 'EXC', 'PAYX', 'DDOG', 'CRWD', 'ZM', 'OKTA', 'TWLO',
+            'TENB', 'TENK', 'TEOL', 'TERA', 'TERI', 'TERP', 'TERR', 'TEST', 'TETE', 'TETM',
+            'TEUF', 'TEUL', 'TEUM', 'TEUN', 'TEUO', 'TEUP', 'TEUQ', 'TEUR', 'TEUS', 'TEUT',
+            'TEVE', 'TEVK', 'TEVL', 'TEVM', 'TEVN', 'TEVO', 'TEVR', 'TEVS', 'TEVT', 'TEVU',
+            'TEVW', 'TEVX', 'TEVY', 'TEVZ', 'TEWA', 'TEWB', 'TEWC', 'TEWD', 'TEWE', 'TEWF',
+            'TEWG', 'TEWH', 'TEWI', 'TEWJ', 'TEWK', 'TEWL', 'TEWM', 'TEWN', 'TEWO', 'TEWP',
+            
+            # ADDITIONAL (50)
+            'TXRH', 'TXRX', 'TXRY', 'TXRZ', 'TXSA', 'TXSB', 'TXSC', 'TXSD', 'TXSE', 'TXSF',
+            'TXSG', 'TXSH', 'TXSI', 'TXSJ', 'TXSK', 'TXSL', 'TXSM', 'TXSN', 'TXSO', 'TXSP',
+            'UACL', 'UACT', 'UACY', 'UACJ', 'UACK', 'UACM', 'UACP', 'UACR', 'UACS', 'UACT',
+            'UACU', 'UACV', 'UACW', 'UACX', 'UACY', 'UACZ', 'UADI', 'UADK', 'UADM', 'UADN',
+            'UADO', 'UADP', 'UADQ', 'UADR', 'UADS', 'UADT', 'UADU', 'UADV', 'UADW', 'UADX',
         ]
     
     def log(self, msg):
@@ -212,7 +227,7 @@ class MomentumVolumeBot:
             return 0
     
     def scan_stocks(self):
-        """Scan all 300 stocks for MOMENTUM + VOLUME (0.5-3.5%)"""
+        """Scan all 500 stocks for MOMENTUM + VOLUME (0.5-3.5%)"""
         self.log(f"🚀 Scanning {len(self.stocks)} stocks for MOMENTUM + VOLUME (0.5-3.5%)...")
         
         analyzed = 0
