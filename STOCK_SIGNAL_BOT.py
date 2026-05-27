@@ -34,10 +34,10 @@ class MomentumVolumeBot:
         # YOUR REAL FINNHUB API KEY
         self.finnhub_key = 'd8bja4hr01qppd8s0760d8bja4hr01qppd8s076g'
         
-        # MOMENTUM + VOLUME CRITERIA - LOOSENED FOR SIGNAL FLOW
-        self.min_momentum = 0.3   # Stock jumped UP at least 0.3%
-        self.max_momentum = 5.0   # Up to 5%
-        self.min_volume = 300000  # Lower volume threshold
+        # MOMENTUM + VOLUME CRITERIA - SUPER LOOSE FOR SIGNAL CAPTURE
+        self.min_momentum = 0.1   # Any movement UP 0.1%+
+        self.max_momentum = 10.0  # Up to 10%
+        self.min_volume = 100000  # Very loose volume
         
         # Profit targets for 2-7 day holds
         self.profit_target = {2: 1.5, 3: 1.9, 4: 2.9, 5: 0.9, 6: 3.2, 7: 2.5}
@@ -59,8 +59,8 @@ class MomentumVolumeBot:
         self.log("=" * 80)
         self.log("🥭 MEGA BOT - MOMENTUM + VOLUME VERSION")
         self.log("📊 500 REAL STOCKS (S&P 500 + NASDAQ + ETFs)")
-        self.log("🚀 Strategy: Find stocks UP 0.3-5% in LAST 5-7 DAYS + 300k Volume")
-        self.log("⏰ SIGNAL FLOW MODE - Loosened for maximum opportunities!")
+        self.log("🚀 Strategy: Find stocks UP 0.1-10% + 100k Volume")
+        self.log("⏰ SUPER LOOSE MODE - Catch ALL signals NOW!")
         self.log("=" * 80)
     
     def get_300_stocks(self):
@@ -233,8 +233,8 @@ class MomentumVolumeBot:
             return 0
     
     def scan_stocks(self):
-        """Scan all 500 stocks for 5-7 DAY MOMENTUM + VOLUME (0.3-5%)"""
-        self.log(f"🚀 Scanning {len(self.stocks)} stocks for 5-7 DAY MOMENTUM (0.3-5%)...")
+        """Scan all 500 stocks for ANY MOMENTUM (0.1-10%)"""
+        self.log(f"🚀 Scanning {len(self.stocks)} stocks for ANY MOMENTUM (0.1-10%)...")
         
         analyzed = 0
         found = 0
@@ -255,7 +255,7 @@ class MomentumVolumeBot:
                     found += 1
                     score = self.calculate_momentum_score(symbol, data)
                     
-                    if score >= 40:  # Lower threshold for signal flow
+                    if score >= 30:  # Super loose threshold for signal capture
                         self.memory['top_scores'][symbol] = {
                             'score': score,
                             'current_price': data['current_price'],
