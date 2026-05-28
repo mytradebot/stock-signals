@@ -142,6 +142,65 @@ class CompleteBot:
                 pass
         self.log(f"✅ Analyzed {found} stocks")
     
+    def monitor_positions(self):
+        """Check open positions for target/stop/time exit"""
+        now = datetime.now()
+        to_close = []
+        
+        for symbol, pos in self.open_positions.items():
+            try:
+                data = self.get_stock_data(symbol)
+                if not data:
+                    continue
+                
+                price = data['price']
+                entry = pos['entry_price']
+                target = pos['target']
+                entry_time = pos['entry_time']
+                
+                # Check if target hit
+                if price >= target:
+                    profit = ((price - entry) / entry) * 100
+                    self.send_sell_signal(symbol, entry, price, profit, "🎉 TARGET HIT!")
+                    to_close.append(symbol)
+                    self.closed_positions[symbol] = {'entry': entry, 'exit': price, 'profit': profit, 'type': 'TARGET'}
+                
+                # Check if 7 days passed
+                elif (now - entry_time).days >= 7:
+                    profit = ((price - entry) / entry) * 100
+                    self.send_sell_signal(symbol, entry, price, profit, "⏰ TIME EXPIRED (7 days)")
+                    to_close.append(symbol)
+                    self.closed_positions[symbol] = {'entry': entry, 'exit': price, 'profit': profit, 'type': 'TIME'}
+            
+            except:
+                pass
+        
+        # Remove closed positions
+        for symbol in to_close:
+            del self.open_positions[symbol]
+    
+    def send_sell_signal(self, symbol, entry, exit_price, profit, reason):
+        """Send SELL signal to Discord"""
+        color = 3066993 if profit > 0 else 15158332  # Green if profit, red if loss
+        
+        embed = {
+            "title": f"{reason} {symbol}",
+            "description": f"⏰ {datetime.now(timezone(timedelta(hours=5, minutes=30))).strftime('%H:%M IST')}",
+            "color": color,
+            "fields": [
+                {"name": "Entry", "value": f"${entry:.2f}", "inline": True},
+                {"name": "Exit", "value": f"${exit_price:.2f}", "inline": True},
+                {"name": "Profit/Loss", "value": f"{profit:+.2f}%", "inline": True}
+            ],
+            "footer": {"text": "🥭 Mango_Bot - Auto Exit"}
+        }
+        
+        try:
+            requests.post(self.webhook, json={'embeds': [embed]}, timeout=10)
+            self.log(f"📤 SELL: {symbol} | Entry: ${entry:.2f} → Exit: ${exit_price:.2f} ({profit:+.2f}%)")
+        except:
+            pass
+    
     def send_signal(self, symbol, data, score):
         price = data['price']
         target = price * 1.035
@@ -185,7 +244,8 @@ class CompleteBot:
             
             if self.is_market_open():
                 self.scan()
-                self.log(f"📊 Open positions: {len(self.open_positions)}")
+                self.monitor_positions()  # Check for auto-sell
+                self.log(f"📊 Open positions: {len(self.open_positions)} | Closed today: {len(self.closed_positions)}")
                 
                 elapsed = datetime.now() - self.last_signal
                 if elapsed >= timedelta(minutes=30):
