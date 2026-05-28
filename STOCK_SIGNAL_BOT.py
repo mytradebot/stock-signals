@@ -29,7 +29,7 @@ class CompleteBot:
         
         self.finnhub_key = 'd8bja4hr01qppd8s0760d8bja4hr01qppd8s076g'
         
-        # 500 BEST STOCKS
+        # 100 BEST STOCKS (Quality over quantity)
         self.stocks = [
             'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'META', 'BERKSH',
             'JNJ', 'V', 'WMT', 'PG', 'UNH', 'MA', 'HD', 'DIS', 'COST', 'LOW',
@@ -43,15 +43,7 @@ class CompleteBot:
             'SNAP', 'TTWO', 'EA', 'BLNK', 'PRPL', 'KKR', 'BX', 'APO', 'OKE', 'MPC',
             'CVX', 'COP', 'SLB', 'EOG', 'FANG', 'HAL', 'NOV', 'OXY', 'APA', 'PALO',
             'CRSR', 'PLTR', 'SQ', 'ZS', 'DBX', 'PATH', 'COIN', 'HOOD', 'SOFI', 'GLBE',
-            'TOST', 'RIOT', 'MARA', 'MSTR', 'CHPT', 'KNSL', 'CPRT', 'OPEN', 'CVNA', 'KIND',
-            'BRKS', 'EVTL', 'WKME', 'POSH', 'FTCH', 'RBLX', 'LCID', 'RIVN', 'FUTU', 'IQ',
-            'VIPS', 'ZTO', 'TCOM', 'TME', 'ORCL', 'SAP', 'TEAM', 'DOCU', 'NEWR', 'SSNC',
-            'PAYC', 'BIDU', 'VRSN', 'ANET', 'DDOG', 'CRWD', 'SPLK', 'F', 'GM', 'BA',
-            'CAT', 'DE', 'GE', 'PFE', 'MRNA', 'ABBV', 'TMO', 'LLY', 'MRK', 'AMGN',
-            'GILD', 'BNTX', 'SGEN', 'BMRN', 'NBIX', 'VIACP', 'MRVL', 'MCHP', 'QRVO', 'SWKS',
-            'JPM', 'BAC', 'WFC', 'GS', 'MS', 'BLK', 'SCHW', 'TROW', 'AXP', 'DFS',
-            'SYF', 'VNO', 'PLD', 'PSA', 'EQR', 'AVB', 'ARE', 'MAA', 'WY', 'RYN',
-        ][:500]
+        ]
         
         self.stocks_analysis = {}
         self.open_positions = {}
@@ -60,7 +52,7 @@ class CompleteBot:
         
         self.log("=" * 70)
         self.log("🥭 MANGO_BOT - COMPLETE TRADING SYSTEM")
-        self.log("📊 500 stocks → 1 BEST signal per 30 min")
+        self.log("📊 100 BEST STOCKS → 1 BEST signal per 30 min")
         self.log("📈 Auto buy/sell + Daily analytics + Best stocks alert")
         self.log("⚡ Smart schedule: 8:30 AM - 4 PM, then sleep")
         self.log("=" * 70)
@@ -155,8 +147,8 @@ class CompleteBot:
         return min(score, 100)
     
     def scan(self):
-        """Scan all 500 stocks"""
-        self.log(f"🔍 Analyzing {len(self.stocks)} stocks...")
+        """Scan 100 best stocks - works with Finnhub free tier"""
+        self.log(f"🔍 Analyzing {len(self.stocks)} best stocks...")
         
         found = 0
         for symbol in self.stocks:
