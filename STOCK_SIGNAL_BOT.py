@@ -206,11 +206,36 @@ class MangoBot:
         # Fallback to Clearbit
         return f"https://logo.clearbit.com/{symbol}.com"
     
+    def why_buy(self, symbol, data, score):
+        """Generate short reason why to buy"""
+        reasons = []
+        
+        if data['prev'] > 0:
+            change = ((data['price'] - data['prev']) / data['prev']) * 100
+            if change > 0.5:
+                reasons.append(f"Momentum +{change:.2f}%")
+        
+        if data['volume'] > 10000000:
+            reasons.append("High liquidity")
+        elif data['volume'] > 5000000:
+            reasons.append("Strong volume")
+        
+        if 50 < data['price'] < 300:
+            reasons.append("Optimal price")
+        
+        if score >= 85:
+            reasons.append("Excellent signal")
+        elif score >= 75:
+            reasons.append("Strong setup")
+        
+        return reasons[0] if reasons else "Quality pick"
+    
     def buy(self, symbol, data, score):
         price = data['price']
         target = price * 1.035
         left = self.signals_left()
         logo = self.get_logo(symbol)
+        reason = self.why_buy(symbol, data, score)
         
         self.open_positions[symbol] = {'entry': price, 'target': target, 'time': datetime.now()}
         self.block(symbol)
@@ -228,9 +253,10 @@ class MangoBot:
                 {"name": "📍 Entry", "value": f"${price:.2f}", "inline": True},
                 {"name": "🎯 Target", "value": f"${target:.2f} (+3.5%)", "inline": True},
                 {"name": "⭐ Score", "value": f"{score}/100", "inline": True},
+                {"name": "💡 Why to Buy", "value": reason, "inline": False},
                 {"name": "📢 Signals Left", "value": f"{left} more today! ⏰", "inline": True},
-                {"name": "💡 Auto Sell", "value": "At target!", "inline": True},
-                {"name": "🔒 Blocked", "value": "7 days", "inline": True}
+                {"name": "💰 Auto Sell", "value": "At target!", "inline": True},
+                {"name": "🔒 Blocked", "value": "7 days (no repeat)", "inline": True}
             ],
             "footer": {"text": "🥭 Mango_Bot - Auto Signals & Auto Exits"}
         }
