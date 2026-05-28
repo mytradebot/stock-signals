@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""MANGO_BOT - FINAL VERSION - IST + 3-min signals + 7-day block"""
+"""MANGO_BOT - 30-MIN SIGNALS + 7-DAY BLOCK + AUTO-SELL"""
 import os, time, json
 from datetime import datetime, timedelta, timezone
 
@@ -36,14 +36,14 @@ class CompleteBot:
         self.stocks_analysis = {}
         self.open_positions = {}
         self.closed_positions = {}
-        self.last_signal = datetime.now()
+        self.last_signal = datetime.now() - timedelta(minutes=31)
         self.blocked_stocks = {}
         self.load_blocked_stocks()
         
         self.log("=" * 70)
-        self.log("🥭 MANGO_BOT - FINAL VERSION (IST + 3-MIN SIGNALS + 7-DAY BLOCK)")
-        self.log("📊 100 BEST STOCKS → 1 signal every 3 MIN")
-        self.log("🚀 Auto buy/sell + Daily analytics + No repeats in 7 days")
+        self.log("🥭 MANGO_BOT - FINAL VERSION")
+        self.log("📊 100 BEST STOCKS → 1 signal every 30 MIN")
+        self.log("🚀 Auto buy/sell + No repeats in 7 days + IST timezone")
         self.log("=" * 70)
     
     def log(self, msg):
@@ -52,7 +52,7 @@ class CompleteBot:
         print(f"[{ts}] {msg}")
     
     def load_blocked_stocks(self):
-        """Load 7-day blocked stocks from file"""
+        """Load 7-day blocked stocks"""
         try:
             if os.path.exists('/home/claude/blocked_stocks.json'):
                 with open('/home/claude/blocked_stocks.json', 'r') as f:
@@ -60,11 +60,11 @@ class CompleteBot:
                     for symbol, ts in data.items():
                         self.blocked_stocks[symbol] = datetime.fromisoformat(ts)
                 self.log(f"✅ Loaded {len(self.blocked_stocks)} blocked stocks")
-        except:
-            pass
+        except Exception as e:
+            self.log(f"⚠️ Could not load blocked stocks: {e}")
     
     def save_blocked_stocks(self):
-        """Save blocked stocks to file"""
+        """Save blocked stocks"""
         try:
             data = {symbol: ts.isoformat() for symbol, ts in self.blocked_stocks.items()}
             with open('/home/claude/blocked_stocks.json', 'w') as f:
@@ -73,10 +73,9 @@ class CompleteBot:
             pass
     
     def is_stock_blocked(self, symbol):
-        """Check if stock blocked (sent in last 7 days)"""
+        """Check if stock blocked"""
         if symbol not in self.blocked_stocks:
             return False
-        
         days = (datetime.now() - self.blocked_stocks[symbol]).days
         if days >= 7:
             del self.blocked_stocks[symbol]
@@ -95,9 +94,13 @@ class CompleteBot:
             response = requests.get(url, timeout=5)
             data = response.json()
             if 'c' in data and data['c'] > 0:
-                return {'price': float(data['c']), 'volume': int(data.get('v', 0)), 
-                        'high': float(data.get('h', data['c'])), 'low': float(data.get('l', data['c'])), 
-                        'prev_close': float(data.get('pc', data['c']))}
+                return {
+                    'price': float(data['c']), 
+                    'volume': int(data.get('v', 0)), 
+                    'high': float(data.get('h', data['c'])), 
+                    'low': float(data.get('l', data['c'])), 
+                    'prev_close': float(data.get('pc', data['c']))
+                }
         except:
             pass
         return None
@@ -129,25 +132,32 @@ class CompleteBot:
     def scan(self):
         self.log(f"🔍 Scanning {len(self.stocks)} stocks...")
         found = 0
-        for symbol in self.stocks:
-            try:
-                data = self.get_stock_data(symbol)
-                if data:
-                    score = self.analyze_stock(symbol, data)
-                    self.stocks_analysis[symbol] = {'score': score, 'price': data['price'], 
-                                                     'volume': data['volume'], 'prev_close': data['prev_close']}
-                    found += 1
-                time.sleep(0.6)
-            except:
-                pass
-        self.log(f"✅ Analyzed {found} stocks")
+        try:
+            for symbol in self.stocks:
+                try:
+                    data = self.get_stock_data(symbol)
+                    if data:
+                        score = self.analyze_stock(symbol, data)
+                        self.stocks_analysis[symbol] = {
+                            'score': score, 
+                            'price': data['price'], 
+                            'volume': data['volume'], 
+                            'prev_close': data['prev_close']
+                        }
+                        found += 1
+                    time.sleep(0.6)
+                except Exception as e:
+                    pass
+            self.log(f"✅ Analyzed {found}/{len(self.stocks)} stocks")
+        except Exception as e:
+            self.log(f"❌ Scan error: {e}")
     
     def monitor_positions(self):
-        """Check open positions for target/stop/time exit"""
+        """Check for target hits, stops, time exits"""
         now = datetime.now()
         to_close = []
         
-        for symbol, pos in self.open_positions.items():
+        for symbol, pos in list(self.open_positions.items()):
             try:
                 data = self.get_stock_data(symbol)
                 if not data:
@@ -158,30 +168,26 @@ class CompleteBot:
                 target = pos['target']
                 entry_time = pos['entry_time']
                 
-                # Check if target hit
+                # Target hit
                 if price >= target:
                     profit = ((price - entry) / entry) * 100
-                    self.send_sell_signal(symbol, entry, price, profit, "🎉 TARGET HIT!")
+                    self.send_sell_signal(symbol, entry, price, profit, "🎉 TARGET HIT")
                     to_close.append(symbol)
-                    self.closed_positions[symbol] = {'entry': entry, 'exit': price, 'profit': profit, 'type': 'TARGET'}
                 
-                # Check if 7 days passed
+                # 7 days passed
                 elif (now - entry_time).days >= 7:
                     profit = ((price - entry) / entry) * 100
-                    self.send_sell_signal(symbol, entry, price, profit, "⏰ TIME EXPIRED (7 days)")
+                    self.send_sell_signal(symbol, entry, price, profit, "⏰ 7-DAY EXIT")
                     to_close.append(symbol)
-                    self.closed_positions[symbol] = {'entry': entry, 'exit': price, 'profit': profit, 'type': 'TIME'}
-            
             except:
                 pass
         
-        # Remove closed positions
         for symbol in to_close:
             del self.open_positions[symbol]
     
     def send_sell_signal(self, symbol, entry, exit_price, profit, reason):
-        """Send SELL signal to Discord"""
-        color = 3066993 if profit > 0 else 15158332  # Green if profit, red if loss
+        """Send SELL signal"""
+        color = 3066993 if profit > 0 else 15158332
         
         embed = {
             "title": f"{reason} {symbol}",
@@ -190,42 +196,45 @@ class CompleteBot:
             "fields": [
                 {"name": "Entry", "value": f"${entry:.2f}", "inline": True},
                 {"name": "Exit", "value": f"${exit_price:.2f}", "inline": True},
-                {"name": "Profit/Loss", "value": f"{profit:+.2f}%", "inline": True}
+                {"name": "P&L", "value": f"{profit:+.2f}%", "inline": True}
             ],
-            "footer": {"text": "🥭 Mango_Bot - Auto Exit"}
+            "footer": {"text": "🥭 Mango_Bot"}
         }
         
         try:
             requests.post(self.webhook, json={'embeds': [embed]}, timeout=10)
-            self.log(f"📤 SELL: {symbol} | Entry: ${entry:.2f} → Exit: ${exit_price:.2f} ({profit:+.2f}%)")
+            self.log(f"📤 SELL: {symbol} | ${entry:.2f} → ${exit_price:.2f} ({profit:+.2f}%)")
         except:
             pass
     
-    def send_signal(self, symbol, data, score):
+    def send_buy_signal(self, symbol, data, score):
+        """Send BUY signal"""
         price = data['price']
         target = price * 1.035
-        logo = f"https://logo.clearbit.com/{symbol}.com"
         
-        self.open_positions[symbol] = {'entry_price': price, 'target': target, 'entry_time': datetime.now()}
+        self.open_positions[symbol] = {
+            'entry_price': price, 
+            'target': target, 
+            'entry_time': datetime.now()
+        }
         self.block_stock(symbol)
         
         embed = {
             "title": f"🟢 MANGO_BOT BUY: {symbol}",
             "description": f"⏰ {datetime.now(timezone(timedelta(hours=5, minutes=30))).strftime('%H:%M IST')}",
             "color": 3066993,
-            "thumbnail": {"url": logo, "height": 100, "width": 100},
             "fields": [
                 {"name": "📍 Entry", "value": f"${price:.2f}", "inline": True},
                 {"name": "🎯 Target", "value": f"${target:.2f} (+3.5%)", "inline": True},
                 {"name": "⭐ Score", "value": f"{score}/100", "inline": True},
-                {"name": "✅ Auto Sell", "value": "When target hits!", "inline": True}
+                {"name": "💡 Auto Sell", "value": "At target!", "inline": True}
             ],
-            "footer": {"text": "🥭 Mango_Bot - No repeats for 7 days!"}
+            "footer": {"text": "🥭 Mango_Bot - No repeats 7 days"}
         }
         
         try:
             requests.post(self.webhook, json={'embeds': [embed]}, timeout=10)
-            self.log(f"📱 SIGNAL: {symbol} @ ${price:.2f} | BLOCKED 7 DAYS")
+            self.log(f"📱 BUY: {symbol} @ ${price:.2f} | Score: {score} | BLOCKED 7 DAYS")
         except:
             self.log("❌ Discord error")
     
@@ -239,31 +248,35 @@ class CompleteBot:
     def run(self):
         cycle = 0
         while True:
-            cycle += 1
-            self.log(f"\n🔄 CYCLE #{cycle}")
-            
-            if self.is_market_open():
-                self.scan()
-                self.monitor_positions()  # Check for auto-sell
-                self.log(f"📊 Open positions: {len(self.open_positions)} | Closed today: {len(self.closed_positions)}")
+            try:
+                cycle += 1
+                self.log(f"\n🔄 CYCLE #{cycle}")
                 
-                elapsed = datetime.now() - self.last_signal
-                if elapsed >= timedelta(minutes=30):
-                    available = {s: d for s, d in self.stocks_analysis.items() if not self.is_stock_blocked(s)}
-                    if available:
-                        best = max(available.items(), key=lambda x: x[1]['score'])
-                        self.send_signal(best[0], best[1], best[1]['score'])
-                        self.last_signal = datetime.now()
+                if self.is_market_open():
+                    self.scan()
+                    self.monitor_positions()
+                    self.log(f"📊 Open: {len(self.open_positions)} | Closed: {len(self.closed_positions)}")
+                    
+                    elapsed = datetime.now() - self.last_signal
+                    if elapsed >= timedelta(minutes=30):
+                        available = {s: d for s, d in self.stocks_analysis.items() if not self.is_stock_blocked(s)}
+                        if available:
+                            best = max(available.items(), key=lambda x: x[1]['score'])
+                            self.send_buy_signal(best[0], best[1], best[1]['score'])
+                            self.last_signal = datetime.now()
+                        else:
+                            self.log("⚠️ All stocks blocked")
                     else:
-                        self.log("⚠️ All stocks blocked, waiting...")
+                        remaining = 30 - int(elapsed.total_seconds() / 60)
+                        self.log(f"⏳ Next signal in {remaining} min")
                 else:
-                    remaining = 30 - int(elapsed.total_seconds() / 60)
-                    self.log(f"⏳ Next signal in {remaining} min")
-            else:
-                self.log("😴 Market closed")
-            
-            self.log("⏱️ Next check in 5 min\n")
-            time.sleep(300)
+                    self.log("😴 Market closed")
+                
+                self.log("⏱️ Next check in 5 min\n")
+                time.sleep(300)
+            except Exception as e:
+                self.log(f"❌ FATAL ERROR: {e}")
+                time.sleep(60)
 
 if __name__ == "__main__":
     bot = CompleteBot()
