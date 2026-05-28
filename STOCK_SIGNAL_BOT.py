@@ -146,6 +146,12 @@ class MangoBot:
         weekday = now.weekday() < 5
         return weekday and open_market
     
+    def is_market_close(self):
+        """Check if market just closed (1:30 AM - 1:35 AM)"""
+        ist = timezone(timedelta(hours=5, minutes=30))
+        now = datetime.now(ist)
+        return now.hour == 1 and 30 <= now.minute < 35
+    
     def monitor(self):
         now = datetime.now()
         to_close = []
@@ -172,6 +178,43 @@ class MangoBot:
         for s in to_close:
             del self.open_positions[s]
     
+    def daily_analytics(self):
+        """Send daily analytics at 1:30 AM IST"""
+        if not self.closed_positions:
+            return
+        
+        total = len(self.closed_positions)
+        wins = sum(1 for p in self.closed_positions.values() if p.get('profit', 0) > 0)
+        losses = total - wins
+        win_rate = (wins / total * 100) if total > 0 else 0
+        
+        total_pnl = sum(p.get('profit', 0) for p in self.closed_positions.values())
+        avg_pnl = total_pnl / total if total > 0 else 0
+        
+        best = max(self.closed_positions.values(), key=lambda x: x.get('profit', 0), default={})
+        worst = min(self.closed_positions.values(), key=lambda x: x.get('profit', 0), default={})
+        
+        embed = {
+            "title": "📊 MANGO_BOT - DAILY ANALYTICS",
+            "description": f"⏰ {datetime.now(timezone(timedelta(hours=5, minutes=30))).strftime('%Y-%m-%d')} IST",
+            "color": 3066993,
+            "fields": [
+                {"name": "📈 Total Trades", "value": f"{total}", "inline": True},
+                {"name": "✅ Win Rate", "value": f"{win_rate:.1f}% ({wins}W/{losses}L)", "inline": True},
+                {"name": "💰 Daily P&L", "value": f"{total_pnl:+.2f}%", "inline": True},
+                {"name": "📊 Avg Per Trade", "value": f"{avg_pnl:+.2f}%", "inline": True},
+                {"name": "🏆 Best Trade", "value": f"{best.get('symbol', 'N/A')}: +{best.get('profit', 0):.2f}%" if best else "N/A", "inline": True},
+                {"name": "❌ Worst Trade", "value": f"{worst.get('symbol', 'N/A')}: {worst.get('profit', 0):.2f}%" if worst else "N/A", "inline": True}
+            ],
+            "footer": {"text": "🥭 Mango_Bot - Market Close Report"}
+        }
+        
+        try:
+            requests.post(self.webhook, json={'embeds': [embed]}, timeout=10)
+            self.log(f"📊 Daily Analytics: {total} trades, {win_rate:.1f}% win rate, {total_pnl:+.2f}% P&L")
+        except:
+            pass
+    
     def sell(self, symbol, entry, exit_price, profit, reason):
         color = 3066993 if profit > 0 else 15158332
         embed = {
@@ -188,6 +231,8 @@ class MangoBot:
         try:
             requests.post(self.webhook, json={'embeds': [embed]}, timeout=10)
             self.log(f"📤 SELL: {symbol} | ${entry:.2f}→${exit_price:.2f} ({profit:+.2f}%)")
+            # Track closed position
+            self.closed_positions[symbol] = {'symbol': symbol, 'entry': entry, 'exit': exit_price, 'profit': profit}
         except:
             pass
     
@@ -291,6 +336,10 @@ class MangoBot:
                     else:
                         mins = 30 - int(elapsed.total_seconds() / 60)
                         self.log(f"⏳ Next signal in {mins} min | {left} signals left!")
+                elif self.is_market_close():
+                    self.log("🏁 MARKET CLOSED - SENDING DAILY ANALYTICS")
+                    self.daily_analytics()
+                    self.closed_positions = {}  # Reset for next day
                 else:
                     self.log("😴 Market closed")
                 
