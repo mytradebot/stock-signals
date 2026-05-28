@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """
-MEGA BOT - COMPLETE TRADING SYSTEM
-500 stocks → Analyze → Pick BEST 1 → Send BUY
-Track positions → Monitor price → Send SELL when target/stop/time hit
-Full P&L tracking + Daily summary
+MANGO_BOT - COMPLETE TRADING SYSTEM
+✅ Market momentum at 8:30 AM (1 hour early)
+✅ Buy signals every 30 min with logos
+✅ Auto-sell signals (target/stop/time)
+✅ Daily analytics at 4 PM
+✅ Best stocks alert at 4 PM
+✅ Bot sleeps after market close
 """
 
 import os
@@ -48,24 +51,18 @@ class CompleteBot:
             'GILD', 'BNTX', 'SGEN', 'BMRN', 'NBIX', 'VIACP', 'MRVL', 'MCHP', 'QRVO', 'SWKS',
             'JPM', 'BAC', 'WFC', 'GS', 'MS', 'BLK', 'SCHW', 'TROW', 'AXP', 'DFS',
             'SYF', 'VNO', 'PLD', 'PSA', 'EQR', 'AVB', 'ARE', 'MAA', 'WY', 'RYN',
-            'PCH', 'IRM', 'SSNC', 'PAYC', 'BIDU', 'VRSN', 'ANET', 'DDOG', 'CRWD', 'SPLK',
-            'QQQ', 'DIA', 'IWM', 'SPY', 'VOO', 'VTI', 'VTV', 'VUG', 'VGK', 'VXUS',
-            'EEM', 'AGG', 'BND', 'LQD', 'HYG', 'JNK', 'TLT', 'IEF', 'SHV', 'GLD',
-            'SLV', 'USO', 'VNQ', 'XRT', 'XLK', 'XLV', 'XLI', 'XLF', 'XLY', 'XLP',
-            'XLRE', 'XLU', 'XLE', 'IVV', 'IJH', 'IJR', 'VB', 'SCHB', 'SCHC', 'SCHD',
-        ][:500]  # Limit to 500
+        ][:500]
         
         self.stocks_analysis = {}
-        self.open_positions = {}  # Track open trades
-        self.closed_positions = {}  # Track closed trades
+        self.open_positions = {}
+        self.closed_positions = {}
         self.last_signal = datetime.now()
-        self.daily_start = datetime.now().replace(hour=9, minute=30)
         
         self.log("=" * 70)
         self.log("🥭 MANGO_BOT - COMPLETE TRADING SYSTEM")
-        self.log("📊 500 stocks → Analyze → BEST 1 BUY signal")
-        self.log("📈 Auto-tracking → SELL when target/stop/time hit")
-        self.log("💰 Full P&L tracking + Daily summary")
+        self.log("📊 500 stocks → 1 BEST signal per 30 min")
+        self.log("📈 Auto buy/sell + Daily analytics + Best stocks alert")
+        self.log("⚡ Smart schedule: 8:30 AM - 4 PM, then sleep")
         self.log("=" * 70)
     
     def log(self, msg):
@@ -91,6 +88,19 @@ class CompleteBot:
             pass
         
         return None
+    
+    def get_stock_logo(self, symbol):
+        """Get stock logo URL from Finnhub"""
+        try:
+            url = f"https://finnhub.io/api/v1/stock/profile2?symbol={symbol}&token={self.finnhub_key}"
+            response = requests.get(url, timeout=5)
+            data = response.json()
+            if 'logo' in data and data['logo']:
+                return data['logo']
+        except:
+            pass
+        
+        return f"https://logo.clearbit.com/{symbol}.com"
     
     def analyze_stock(self, symbol, data):
         """Analyze stock and give score 0-100"""
@@ -169,42 +179,26 @@ class CompleteBot:
         
         self.log(f"   ✅ Analyzed {found} stocks")
     
-    def get_stock_logo(self, symbol):
-        """Get stock logo URL from Finnhub"""
-        try:
-            url = f"https://finnhub.io/api/v1/stock/profile2?symbol={symbol}&token={self.finnhub_key}"
-            response = requests.get(url, timeout=5)
-            data = response.json()
-            if 'logo' in data and data['logo']:
-                return data['logo']
-        except:
-            pass
-        
-        # Fallback logo
-        return f"https://logo.clearbit.com/{symbol}.com"
-    
     def send_buy_signal(self, symbol, data, score):
-        """Send BUY signal to Discord with logo and track position"""
+        """Send BUY signal to Discord"""
         price = data['price']
-        target = price * 1.025  # +2.5% target
-        stop = price * 0.98    # -2% stop
+        target = price * 1.025
+        stop = price * 0.98
         logo_url = self.get_stock_logo(symbol)
         
-        # Track position
         self.open_positions[symbol] = {
             'entry_price': price,
             'target': target,
             'stop': stop,
             'entry_time': datetime.now(),
-            'timeframe': 7,  # 7 day hold max
+            'timeframe': 7,
             'score': score
         }
         
-        # Discord Embed with logo - NO STOP LOSS (bot handles it)
         embed = {
             "title": f"🟢 MANGO_BOT BUY: {symbol}",
             "description": f"⏰ {datetime.now().strftime('%H:%M %Z')}",
-            "color": 3066993,  # Green
+            "color": 3066993,
             "thumbnail": {
                 "url": logo_url,
                 "height": 100,
@@ -268,170 +262,159 @@ class CompleteBot:
                 target = pos['target']
                 stop = pos['stop']
                 entry_time = pos['entry_time']
-                
                 logo_url = self.get_stock_logo(symbol)
                 
-                # Check if target hit
+                embed = None
+                
                 if current_price >= target:
                     pnl = ((current_price - entry) / entry) * 100
-                    
                     embed = {
                         "title": f"🎉 SELL - TARGET HIT!",
                         "description": f"{symbol}",
-                        "color": 3066993,  # Green
-                        "thumbnail": {
-                            "url": logo_url,
-                            "height": 100,
-                            "width": 100
-                        },
+                        "color": 3066993,
+                        "thumbnail": {"url": logo_url, "height": 100, "width": 100},
                         "fields": [
-                            {
-                                "name": "Entry → Exit",
-                                "value": f"${entry:.2f} → ${current_price:.2f}",
-                                "inline": False
-                            },
-                            {
-                                "name": "Profit",
-                                "value": f"+{pnl:.2f}% ✅",
-                                "inline": True
-                            },
-                            {
-                                "name": "Status",
-                                "value": "TAKE PROFIT!",
-                                "inline": True
-                            }
+                            {"name": "Entry → Exit", "value": f"${entry:.2f} → ${current_price:.2f}", "inline": False},
+                            {"name": "Profit", "value": f"+{pnl:.2f}% ✅", "inline": True},
+                            {"name": "Status", "value": "TAKE PROFIT!", "inline": True}
                         ]
                     }
                     
-                    self.closed_positions[symbol] = {
-                        'entry': entry,
-                        'exit': current_price,
-                        'pnl': pnl,
-                        'reason': 'TARGET_HIT'
-                    }
+                    self.closed_positions[symbol] = {'entry': entry, 'exit': current_price, 'pnl': pnl, 'reason': 'TARGET_HIT'}
                     closed.append(symbol)
                 
-                # Check if stop hit
                 elif current_price <= stop:
                     pnl = ((current_price - entry) / entry) * 100
-                    
                     embed = {
                         "title": f"⛔ SELL - STOP HIT",
                         "description": f"{symbol}",
-                        "color": 15158332,  # Red
-                        "thumbnail": {
-                            "url": logo_url,
-                            "height": 100,
-                            "width": 100
-                        },
+                        "color": 15158332,
+                        "thumbnail": {"url": logo_url, "height": 100, "width": 100},
                         "fields": [
-                            {
-                                "name": "Entry → Exit",
-                                "value": f"${entry:.2f} → ${current_price:.2f}",
-                                "inline": False
-                            },
-                            {
-                                "name": "Loss",
-                                "value": f"{pnl:.2f}% ❌",
-                                "inline": True
-                            },
-                            {
-                                "name": "Status",
-                                "value": "CUT LOSS",
-                                "inline": True
-                            }
+                            {"name": "Entry → Exit", "value": f"${entry:.2f} → ${current_price:.2f}", "inline": False},
+                            {"name": "Loss", "value": f"{pnl:.2f}% ❌", "inline": True},
+                            {"name": "Status", "value": "CUT LOSS", "inline": True}
                         ]
                     }
                     
-                    self.closed_positions[symbol] = {
-                        'entry': entry,
-                        'exit': current_price,
-                        'pnl': pnl,
-                        'reason': 'STOP_HIT'
-                    }
+                    self.closed_positions[symbol] = {'entry': entry, 'exit': current_price, 'pnl': pnl, 'reason': 'STOP_HIT'}
                     closed.append(symbol)
                 
-                # Check if timeframe expired (7 days)
                 elif (datetime.now() - entry_time).days >= pos['timeframe']:
                     pnl = ((current_price - entry) / entry) * 100
-                    
                     embed = {
                         "title": f"⏰ SELL - TIME EXPIRED",
                         "description": f"{symbol}",
-                        "color": 15844367,  # Orange
-                        "thumbnail": {
-                            "url": logo_url,
-                            "height": 100,
-                            "width": 100
-                        },
+                        "color": 15844367,
+                        "thumbnail": {"url": logo_url, "height": 100, "width": 100},
                         "fields": [
-                            {
-                                "name": "Entry → Exit",
-                                "value": f"${entry:.2f} → ${current_price:.2f}",
-                                "inline": False
-                            },
-                            {
-                                "name": "Return",
-                                "value": f"{pnl:+.2f}%",
-                                "inline": True
-                            },
-                            {
-                                "name": "Status",
-                                "value": "7 DAY HOLD DONE",
-                                "inline": True
-                            }
+                            {"name": "Entry → Exit", "value": f"${entry:.2f} → ${current_price:.2f}", "inline": False},
+                            {"name": "Return", "value": f"{pnl:+.2f}%", "inline": True},
+                            {"name": "Status", "value": "7 DAY HOLD DONE", "inline": True}
                         ]
                     }
                     
-                    self.closed_positions[symbol] = {
-                        'entry': entry,
-                        'exit': current_price,
-                        'pnl': pnl,
-                        'reason': 'TIME_EXPIRED'
-                    }
+                    self.closed_positions[symbol] = {'entry': entry, 'exit': current_price, 'pnl': pnl, 'reason': 'TIME_EXPIRED'}
                     closed.append(symbol)
                 
-                else:
-                    # Still open - show update
-                    pnl = ((current_price - entry) / entry) * 100
-                    continue
-                
-                # Send message
-                try:
-                    requests.post(self.webhook, json={'embeds': [embed]}, timeout=10)
-                except:
-                    pass
+                if embed:
+                    try:
+                        requests.post(self.webhook, json={'embeds': [embed]}, timeout=10)
+                    except:
+                        pass
             
             except:
                 pass
         
-        # Remove closed positions
         for symbol in closed:
             del self.open_positions[symbol]
     
+    def check_market_momentum(self):
+        """Check market momentum at 8:30 AM (1 hour before market opens)"""
+        try:
+            spy_data = self.get_stock_data('SPY')
+            qqq_data = self.get_stock_data('QQQ')
+            vix_data = self.get_stock_data('VIX')
+            
+            if not spy_data or not qqq_data:
+                return None
+            
+            spy_change = ((spy_data['price'] - spy_data['prev_close']) / spy_data['prev_close']) * 100
+            qqq_change = ((qqq_data['price'] - qqq_data['prev_close']) / qqq_data['prev_close']) * 100
+            vix_price = vix_data['price'] if vix_data else 20
+            
+            avg_change = (spy_change + qqq_change) / 2
+            
+            if avg_change > 1:
+                sentiment = "🚀 BULLISH"
+                color = 3066993
+                message = "Today is a GREAT day to invest! Market opening STRONG 📈"
+                emoji = "🟢"
+                strategy = "✅ Aggressive - Take signals with confidence!"
+            elif avg_change > 0.3:
+                sentiment = "📈 POSITIVE"
+                color = 3066993
+                message = "Good momentum today! Markets looking positive 📊"
+                emoji = "🟢"
+                strategy = "✅ Normal - Standard trading. Follow all signals."
+            elif avg_change > -0.3:
+                sentiment = "➡️ NEUTRAL"
+                color = 16776960
+                message = "Markets are neutral today. Be cautious with entries 🔍"
+                emoji = "🟡"
+                strategy = "⚠️ Cautious - Only take high-quality signals (90+)."
+            elif avg_change > -1:
+                sentiment = "📉 BEARISH"
+                color = 15158332
+                message = "Markets struggling today. Wait for better entries ⛔"
+                emoji = "🔴"
+                strategy = "❌ Selective - Only trade proven patterns."
+            else:
+                sentiment = "🔴 VERY BEARISH"
+                color = 15158332
+                message = "Strong selling pressure today. SKIP trading ⛔"
+                emoji = "🔴"
+                strategy = "❌ SKIP - Avoid trading today."
+            
+            embed = {
+                "title": f"{emoji} MANGO_BOT - MARKET MOMENTUM",
+                "description": f"📅 {datetime.now().strftime('%A, %B %d, %Y')} | 1 Hour Before Market",
+                "color": color,
+                "fields": [
+                    {"name": "📊 Market Sentiment", "value": sentiment, "inline": True},
+                    {"name": "📈 S&P 500 (SPY)", "value": f"{spy_change:+.2f}%", "inline": True},
+                    {"name": "💻 Nasdaq (QQQ)", "value": f"{qqq_change:+.2f}%", "inline": True},
+                    {"name": "😰 Market Fear (VIX)", "value": f"{vix_price:.1f}" + (" HIGH" if vix_price > 25 else ""), "inline": True},
+                    {"name": "💡 Today's Action", "value": message, "inline": False},
+                    {"name": "🎯 Strategy", "value": strategy, "inline": False}
+                ],
+                "footer": {"text": "🥭 Mango_Bot - Market Outlook | Happy Trading!"}
+            }
+            
+            try:
+                requests.post(self.webhook, json={'embeds': [embed]}, timeout=10)
+                self.log(f"📈 Market momentum sent! Sentiment: {sentiment}")
+            except:
+                self.log("❌ Discord error")
+        
+        except Exception as e:
+            self.log(f"❌ Error checking momentum: {e}")
+    
     def calculate_stock_performance(self):
-        """Calculate win rate for each stock"""
+        """Calculate win rate per stock"""
         stock_stats = {}
         
         for symbol, trade in self.closed_positions.items():
             if symbol not in stock_stats:
-                stock_stats[symbol] = {
-                    'total': 0,
-                    'wins': 0,
-                    'losses': 0,
-                    'avg_pnl': 0,
-                    'total_pnl': 0
-                }
+                stock_stats[symbol] = {'total': 0, 'wins': 0, 'losses': 0, 'avg_pnl': 0, 'total_pnl': 0}
             
             stock_stats[symbol]['total'] += 1
             if trade['pnl'] > 0:
                 stock_stats[symbol]['wins'] += 1
             else:
                 stock_stats[symbol]['losses'] += 1
-            
             stock_stats[symbol]['total_pnl'] += trade['pnl']
         
-        # Calculate averages and win rates
         for symbol in stock_stats:
             total = stock_stats[symbol]['total']
             if total > 0:
@@ -443,215 +426,17 @@ class CompleteBot:
         
         return stock_stats
     
-    def send_best_stocks_alert(self):
-        """Send best and worst stocks alert"""
-        stock_stats = self.calculate_stock_performance()
-        
-        if not stock_stats:
-            embed = {
-                "title": "📊 BEST STOCKS ALERT",
-                "description": f"{datetime.now().strftime('%A, %B %d, %Y')}",
-                "color": 16776960,  # Yellow
-                "fields": [
-                    {
-                        "name": "📈 Status",
-                        "value": "Not enough data yet. Keep trading! 📊",
-                        "inline": False
-                    }
-                ],
-                "footer": {
-                    "text": "🥭 Mango_Bot - Coming soon!"
-                }
-            }
-        else:
-            # Find top 5 performers
-            sorted_stocks = sorted(stock_stats.items(), key=lambda x: x[1]['win_rate'], reverse=True)
-            top_performers = sorted_stocks[:5]
-            worst_performers = sorted_stocks[-5:]
-            
-            # Build fields
-            fields = []
-            
-            # Top performers
-            fields.append({
-                "name": "🏆 TOP PERFORMERS (BUY THESE!)",
-                "value": "High win rate stocks",
-                "inline": False
-            })
-            
-            for symbol, stats in top_performers:
-                if stats['total'] >= 2:  # Only show if at least 2 trades
-                    fields.append({
-                        "name": f"✅ {symbol}",
-                        "value": f"{stats['win_rate']:.0f}% win rate ({stats['wins']}W/{stats['losses']}L) | Avg: {stats['avg_pnl']:+.2f}%",
-                        "inline": False
-                    })
-            
-            fields.append({
-                "name": "❌ AVOID THESE (SKIP!)",
-                "value": "Low win rate stocks",
-                "inline": False
-            })
-            
-            # Worst performers
-            for symbol, stats in worst_performers:
-                if stats['total'] >= 2:  # Only show if at least 2 trades
-                    if stats['win_rate'] < 60:  # Only show if under 60% win rate
-                        fields.append({
-                            "name": f"⛔ {symbol}",
-                            "value": f"{stats['win_rate']:.0f}% win rate ({stats['wins']}W/{stats['losses']}L) | Avg: {stats['avg_pnl']:+.2f}%",
-                            "inline": False
-                        })
-            
-            embed = {
-                "title": "📊 BEST STOCKS ALERT",
-                "description": f"{datetime.now().strftime('%A, %B %d, %Y')} | Smart Trading Filter",
-                "color": 3066993,  # Green
-                "fields": fields,
-                "footer": {
-                    "text": "🥭 Mango_Bot - Trade smarter, follow the winners!"
-                }
-            }
-        
-        try:
-            requests.post(self.webhook, json={'embeds': [embed]}, timeout=10)
-            self.log("📊 Best stocks alert sent to Discord!")
-        except:
-            self.log("❌ Discord error sending best stocks alert")
-        """Check market momentum at market open"""
-        try:
-            # Get S&P 500 (SPY) data
-            spy_data = self.get_stock_data('SPY')
-            
-            # Get Nasdaq (QQQ) data
-            qqq_data = self.get_stock_data('QQQ')
-            
-            # Get VIX (volatility)
-            vix_data = self.get_stock_data('VIX')
-            
-            if not spy_data or not qqq_data:
-                return None
-            
-            spy_change = ((spy_data['price'] - spy_data['prev_close']) / spy_data['prev_close']) * 100
-            qqq_change = ((qqq_data['price'] - qqq_data['prev_close']) / qqq_data['prev_close']) * 100
-            vix_price = vix_data['price'] if vix_data else 20
-            
-            # Determine market sentiment
-            avg_change = (spy_change + qqq_change) / 2
-            
-            if avg_change > 1:
-                sentiment = "🚀 BULLISH"
-                color = 3066993  # Green
-                message = "Today is a GREAT day to invest! Market opening STRONG 📈"
-                emoji = "🟢"
-            elif avg_change > 0.3:
-                sentiment = "📈 POSITIVE"
-                color = 3066993  # Green
-                message = "Good momentum today! Markets looking positive 📊"
-                emoji = "🟢"
-            elif avg_change > -0.3:
-                sentiment = "➡️ NEUTRAL"
-                color = 16776960  # Yellow
-                message = "Markets are neutral today. Be cautious with entries 🔍"
-                emoji = "🟡"
-            elif avg_change > -1:
-                sentiment = "📉 BEARISH"
-                color = 15158332  # Red
-                message = "Markets struggling today. Wait for better entries ⛔"
-                emoji = "🔴"
-            else:
-                sentiment = "🔴 VERY BEARISH"
-                color = 15158332  # Red
-                message = "Strong selling pressure today. SKIP trading or be very selective ⛔"
-                emoji = "🔴"
-            
-            # Create embed
-            embed = {
-                "title": f"{emoji} MANGO_BOT - MARKET MOMENTUM",
-                "description": f"📅 {datetime.now().strftime('%A, %B %d, %Y')} | Market Open",
-                "color": color,
-                "fields": [
-                    {
-                        "name": "📊 Market Sentiment",
-                        "value": sentiment,
-                        "inline": True
-                    },
-                    {
-                        "name": "📈 S&P 500 (SPY)",
-                        "value": f"{spy_change:+.2f}%",
-                        "inline": True
-                    },
-                    {
-                        "name": "💻 Nasdaq (QQQ)",
-                        "value": f"{qqq_change:+.2f}%",
-                        "inline": True
-                    },
-                    {
-                        "name": "😰 Market Fear (VIX)",
-                        "value": f"{vix_price:.1f}" + (" 📈 HIGH" if vix_price > 25 else " NORMAL"),
-                        "inline": True
-                    },
-                    {
-                        "name": "💡 Today's Action",
-                        "value": message,
-                        "inline": False
-                    },
-                    {
-                        "name": "🎯 Strategy",
-                        "value": self.get_trading_strategy(sentiment),
-                        "inline": False
-                    }
-                ],
-                "footer": {
-                    "text": "🥭 Mango_Bot - Market Outlook | Happy Trading!"
-                }
-            }
-            
-            try:
-                requests.post(self.webhook, json={'embeds': [embed]}, timeout=10)
-                self.log(f"📈 Market momentum analysis sent! Sentiment: {sentiment}")
-            except:
-                self.log("❌ Discord error sending momentum")
-        
-        except Exception as e:
-            self.log(f"❌ Error checking market momentum: {e}")
-    
-    def get_trading_strategy(self, sentiment):
-        """Get trading strategy based on sentiment"""
-        strategies = {
-            "🚀 BULLISH": "✅ Aggressive - Take signals with confidence! Volume will support moves.",
-            "📈 POSITIVE": "✅ Normal - Standard trading. Follow all signals normally.",
-            "➡️ NEUTRAL": "⚠️ Cautious - Only take high-quality signals (90+ score). Watch for reversals.",
-            "📉 BEARISH": "❌ Selective - Only trade proven patterns. Skip weak setups.",
-            "🔴 VERY BEARISH": "❌ SKIP - Avoid trading today. Wait for better conditions."
-        }
-        return strategies.get(sentiment, "Trade normally.")
-        """Send daily analytics at market close (4:00 PM EDT)"""
+    def send_daily_analytics(self):
+        """Send daily analytics at 4:00 PM"""
         if not self.closed_positions:
             embed = {
                 "title": "📊 MANGO_BOT - DAILY ANALYTICS",
                 "description": f"{datetime.now().strftime('%A, %B %d, %Y')}",
-                "color": 15158332,  # Red
-                "fields": [
-                    {
-                        "name": "Total Trades",
-                        "value": "0",
-                        "inline": True
-                    },
-                    {
-                        "name": "Win Rate",
-                        "value": "N/A",
-                        "inline": True
-                    },
-                    {
-                        "name": "Daily P&L",
-                        "value": "No trades today",
-                        "inline": True
-                    }
-                ],
-                "footer": {
-                    "text": "🥭 Mango_Bot - Market Close Report"
-                }
+                "color": 15158332,
+                "fields": [{"name": "Total Trades", "value": "0", "inline": True},
+                           {"name": "Win Rate", "value": "N/A", "inline": True},
+                           {"name": "Daily P&L", "value": "No trades today", "inline": True}],
+                "footer": {"text": "🥭 Mango_Bot - Market Close Report"}
             }
         else:
             total_trades = len(self.closed_positions)
@@ -661,74 +446,77 @@ class CompleteBot:
             avg_pnl = sum(p['pnl'] for p in self.closed_positions.values()) / total_trades if total_trades > 0 else 0
             total_pnl = sum(p['pnl'] for p in self.closed_positions.values())
             
-            # Find best and worst trades
             best_trade = max(self.closed_positions.items(), key=lambda x: x[1]['pnl'])
             worst_trade = min(self.closed_positions.items(), key=lambda x: x[1]['pnl'])
             
-            # Color based on performance
-            color = 3066993 if total_pnl > 0 else 15158332  # Green if profit, Red if loss
+            color = 3066993 if total_pnl > 0 else 15158332
             
             embed = {
                 "title": "📊 MANGO_BOT - DAILY ANALYTICS",
                 "description": f"{datetime.now().strftime('%A, %B %d, %Y')}",
                 "color": color,
                 "fields": [
-                    {
-                        "name": "📈 Total Trades",
-                        "value": f"{total_trades}",
-                        "inline": True
-                    },
-                    {
-                        "name": "✅ Win Rate",
-                        "value": f"{win_rate:.1f}% ({winners}W/{losers}L)",
-                        "inline": True
-                    },
-                    {
-                        "name": "💰 Daily P&L",
-                        "value": f"{total_pnl:+.2f}%",
-                        "inline": True
-                    },
-                    {
-                        "name": "📊 Average Per Trade",
-                        "value": f"{avg_pnl:+.2f}%",
-                        "inline": True
-                    },
-                    {
-                        "name": "🏆 Best Trade",
-                        "value": f"{best_trade[0]} (+{best_trade[1]['pnl']:.2f}%)",
-                        "inline": True
-                    },
-                    {
-                        "name": "📉 Worst Trade",
-                        "value": f"{worst_trade[0]} ({worst_trade[1]['pnl']:.2f}%)",
-                        "inline": True
-                    },
-                    {
-                        "name": "🎯 Target Hit",
-                        "value": f"{sum(1 for p in self.closed_positions.values() if p['reason'] == 'TARGET_HIT')} ✅",
-                        "inline": True
-                    },
-                    {
-                        "name": "🛑 Stop Hit",
-                        "value": f"{sum(1 for p in self.closed_positions.values() if p['reason'] == 'STOP_HIT')} ❌",
-                        "inline": True
-                    },
-                    {
-                        "name": "⏰ Time Expired",
-                        "value": f"{sum(1 for p in self.closed_positions.values() if p['reason'] == 'TIME_EXPIRED')} ⏰",
-                        "inline": True
-                    }
+                    {"name": "📈 Total Trades", "value": f"{total_trades}", "inline": True},
+                    {"name": "✅ Win Rate", "value": f"{win_rate:.1f}% ({winners}W/{losers}L)", "inline": True},
+                    {"name": "💰 Daily P&L", "value": f"{total_pnl:+.2f}%", "inline": True},
+                    {"name": "📊 Average Per Trade", "value": f"{avg_pnl:+.2f}%", "inline": True},
+                    {"name": "🏆 Best Trade", "value": f"{best_trade[0]} (+{best_trade[1]['pnl']:.2f}%)", "inline": True},
+                    {"name": "📉 Worst Trade", "value": f"{worst_trade[0]} ({worst_trade[1]['pnl']:.2f}%)", "inline": True},
+                    {"name": "🎯 Target Hit", "value": f"{sum(1 for p in self.closed_positions.values() if p['reason'] == 'TARGET_HIT')} ✅", "inline": True},
+                    {"name": "🛑 Stop Hit", "value": f"{sum(1 for p in self.closed_positions.values() if p['reason'] == 'STOP_HIT')} ❌", "inline": True},
+                    {"name": "⏰ Time Expired", "value": f"{sum(1 for p in self.closed_positions.values() if p['reason'] == 'TIME_EXPIRED')} ⏰", "inline": True}
                 ],
-                "footer": {
-                    "text": "🥭 Mango_Bot - Market Close Report | See you tomorrow!"
-                }
+                "footer": {"text": "🥭 Mango_Bot - Market Close Report | See you tomorrow!"}
             }
         
         try:
             requests.post(self.webhook, json={'embeds': [embed]}, timeout=10)
-            self.log("📊 Daily analytics sent to Discord!")
+            self.log("📊 Daily analytics sent!")
         except:
-            self.log("❌ Discord error sending analytics")
+            self.log("❌ Discord error")
+    
+    def send_best_stocks_alert(self):
+        """Send best and worst stocks alert"""
+        stock_stats = self.calculate_stock_performance()
+        
+        if not stock_stats:
+            embed = {
+                "title": "📊 BEST STOCKS ALERT",
+                "description": f"{datetime.now().strftime('%A, %B %d, %Y')}",
+                "color": 16776960,
+                "fields": [{"name": "📈 Status", "value": "Not enough data yet. Keep trading! 📊", "inline": False}],
+                "footer": {"text": "🥭 Mango_Bot - Coming soon!"}
+            }
+        else:
+            sorted_stocks = sorted(stock_stats.items(), key=lambda x: x[1]['win_rate'], reverse=True)
+            top_performers = sorted_stocks[:5]
+            worst_performers = sorted_stocks[-5:]
+            
+            fields = [{"name": "🏆 TOP PERFORMERS (BUY THESE!)", "value": "High win rate stocks", "inline": False}]
+            
+            for symbol, stats in top_performers:
+                if stats['total'] >= 2:
+                    fields.append({"name": f"✅ {symbol}", "value": f"{stats['win_rate']:.0f}% win ({stats['wins']}W/{stats['losses']}L) | Avg: {stats['avg_pnl']:+.2f}%", "inline": False})
+            
+            fields.append({"name": "❌ AVOID THESE (SKIP!)", "value": "Low win rate stocks", "inline": False})
+            
+            for symbol, stats in worst_performers:
+                if stats['total'] >= 2 and stats['win_rate'] < 60:
+                    fields.append({"name": f"⛔ {symbol}", "value": f"{stats['win_rate']:.0f}% win ({stats['wins']}W/{stats['losses']}L) | Avg: {stats['avg_pnl']:+.2f}%", "inline": False})
+            
+            embed = {
+                "title": "📊 BEST STOCKS ALERT",
+                "description": f"{datetime.now().strftime('%A, %B %d, %Y')} | Smart Trading Filter",
+                "color": 3066993,
+                "fields": fields,
+                "footer": {"text": "🥭 Mango_Bot - Trade smarter, follow the winners!"}
+            }
+        
+        try:
+            requests.post(self.webhook, json={'embeds': [embed]}, timeout=10)
+            self.log("📊 Best stocks alert sent!")
+        except:
+            self.log("❌ Discord error")
     
     def is_market_hours(self):
         """Check if market is open (EDT) - 9:30 AM to 4:00 PM"""
@@ -753,38 +541,33 @@ class CompleteBot:
         return is_weekday and is_pre
     
     def run(self):
-        """Main loop - Smart schedule: check 1hr early, run during market, sleep after close"""
+        """Main loop - Smart schedule"""
         cycle = 0
         daily_analytics_sent = False
         market_momentum_sent = False
         
         while True:
-            cycle += 1
-            
             # PRE-MARKET: Check 1 hour before market opens (8:30 AM)
             if self.is_pre_market():
                 if not market_momentum_sent:
+                    cycle += 1
                     self.log(f"\n🔄 CYCLE #{cycle} - PRE-MARKET CHECK")
                     self.log("📈 1 HOUR BEFORE MARKET OPENS - CHECKING MOMENTUM!")
                     self.check_market_momentum()
                     market_momentum_sent = True
                     self.log("⏱️ Waiting for market open at 9:30 AM...\n")
                 
-                time.sleep(300)  # Check every 5 min during pre-market
+                time.sleep(300)
             
             # MARKET HOURS: 9:30 AM - 4:00 PM EDT
             elif self.is_market_hours():
                 cycle += 1
                 self.log(f"\n🔄 CYCLE #{cycle}")
                 
-                # Scan for new signals
                 self.scan()
-                
-                # Monitor existing positions (every cycle = every 5 min)
                 self.monitor_positions()
                 self.log(f"   📊 Open positions: {len(self.open_positions)}")
                 
-                # Send new signal every 30 min
                 elapsed = datetime.now() - self.last_signal
                 if elapsed >= timedelta(minutes=30):
                     self.log("⏰ 30 min - SENDING NEW SIGNAL!")
@@ -801,7 +584,6 @@ class CompleteBot:
                     remaining = 30 - int(elapsed.total_seconds() / 60)
                     self.log(f"   ⏳ Next signal in {remaining} min")
                 
-                # Daily analytics + Best stocks alert at 4:00 PM (market close)
                 if datetime.now().hour == 16 and datetime.now().minute < 5 and not daily_analytics_sent:
                     self.log("📊 MARKET CLOSE - SENDING DAILY ANALYTICS!")
                     self.send_daily_analytics()
@@ -813,16 +595,14 @@ class CompleteBot:
                 self.log("⏱️ Next check in 5 min...\n")
                 time.sleep(300)
             
-            # AFTER MARKET CLOSE: Sleep until next day
+            # AFTER MARKET CLOSE: Sleep
             else:
                 self.log(f"\n😴 MARKET CLOSED - BOT SLEEPING")
                 self.log("⏳ See you tomorrow at 8:30 AM!\n")
                 
-                # Reset flags for next day
                 daily_analytics_sent = False
                 market_momentum_sent = False
                 
-                # Sleep for 10 minutes, then check again
                 time.sleep(600)
 
 
