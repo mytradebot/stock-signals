@@ -211,6 +211,7 @@ class CompleteBot:
         """Send BUY signal"""
         price = data['price']
         target = price * 1.035
+        signals_left = self.get_remaining_signals()
         
         self.open_positions[symbol] = {
             'entry_price': price, 
@@ -227,16 +228,41 @@ class CompleteBot:
                 {"name": "📍 Entry", "value": f"${price:.2f}", "inline": True},
                 {"name": "🎯 Target", "value": f"${target:.2f} (+3.5%)", "inline": True},
                 {"name": "⭐ Score", "value": f"{score}/100", "inline": True},
-                {"name": "💡 Auto Sell", "value": "At target!", "inline": True}
+                {"name": "📢 Signals Left", "value": f"{signals_left} more today! ⏰", "inline": True},
+                {"name": "💡 Auto Sell", "value": "At target!", "inline": True},
+                {"name": "🔒 Blocked", "value": "7 days (no repeats)", "inline": True}
             ],
-            "footer": {"text": "🥭 Mango_Bot - No repeats 7 days"}
+            "footer": {"text": "🥭 Mango_Bot - Auto Signals & Auto Exits"}
         }
         
         try:
             requests.post(self.webhook, json={'embeds': [embed]}, timeout=10)
-            self.log(f"📱 BUY: {symbol} @ ${price:.2f} | Score: {score} | BLOCKED 7 DAYS")
+            self.log(f"📱 BUY: {symbol} @ ${price:.2f} | Score: {score} | {signals_left} signals left!")
         except:
             self.log("❌ Discord error")
+    
+    def get_remaining_signals(self):
+        """Calculate signals left today"""
+        ist = timezone(timedelta(hours=5, minutes=30))
+        now = datetime.now(ist)
+        
+        # Market: 7 PM (19:00) to 1:30 AM (01:30)
+        if now.hour > 1 or (now.hour == 1 and now.minute >= 30):
+            # After 1:30 AM
+            if now.hour < 18:
+                return 0
+        
+        if now.hour >= 19:
+            # From 7 PM to midnight
+            minutes_until_close = (24 - now.hour) * 60 - now.minute + 90  # 90 min = 1:30 AM
+        elif now.hour < 1:
+            # From midnight to 1:30 AM
+            minutes_until_close = (1 - now.hour) * 60 - now.minute + 30
+        else:
+            return 0
+        
+        signals = (minutes_until_close // 30) + 1
+        return max(0, signals)
     
     def is_market_open(self):
         ist = timezone(timedelta(hours=5, minutes=30))
@@ -258,6 +284,7 @@ class CompleteBot:
                     self.log(f"📊 Open: {len(self.open_positions)} | Closed: {len(self.closed_positions)}")
                     
                     elapsed = datetime.now() - self.last_signal
+                    signals_left = self.get_remaining_signals()
                     if elapsed >= timedelta(minutes=30):
                         available = {s: d for s, d in self.stocks_analysis.items() if not self.is_stock_blocked(s)}
                         if available:
@@ -268,7 +295,7 @@ class CompleteBot:
                             self.log("⚠️ All stocks blocked")
                     else:
                         remaining = 30 - int(elapsed.total_seconds() / 60)
-                        self.log(f"⏳ Next signal in {remaining} min")
+                        self.log(f"⏳ Next signal in {remaining} min | {signals_left} signals left today!")
                 else:
                     self.log("😴 Market closed")
                 
