@@ -188,7 +188,7 @@ class CompleteBot:
                 self.log(f"📊 Open positions: {len(self.open_positions)}")
                 
                 elapsed = datetime.now() - self.last_signal
-                if elapsed >= timedelta(minutes=3):
+                if elapsed >= timedelta(minutes=30):
                     available = {s: d for s, d in self.stocks_analysis.items() if not self.is_stock_blocked(s)}
                     if available:
                         best = max(available.items(), key=lambda x: x[1]['score'])
@@ -197,13 +197,13 @@ class CompleteBot:
                     else:
                         self.log("⚠️ All stocks blocked, waiting...")
                 else:
-                    remaining = 3 - int(elapsed.total_seconds() / 60)
+                    remaining = 30 - int(elapsed.total_seconds() / 60)
                     self.log(f"⏳ Next signal in {remaining} min")
             else:
                 self.log("😴 Market closed")
             
-            self.log("⏱️ Next check in 1 min\n")
-            time.sleep(60)
+            self.log("⏱️ Next check in 5 min\n")
+            time.sleep(300)
 
 if __name__ == "__main__":
     bot = CompleteBot()
