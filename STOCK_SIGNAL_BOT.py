@@ -2,7 +2,7 @@
 """
 MANGO_BOT - COMPLETE TRADING SYSTEM
 ✅ Market momentum at 8:30 AM (1 hour early)
-✅ Buy signals every 30 min with logos
+✅ Buy signals every 3 min with logos
 ✅ Auto-sell signals (target/stop/time)
 ✅ Daily analytics at 4 PM
 ✅ Best stocks alert at 4 PM
@@ -49,16 +49,64 @@ class CompleteBot:
         self.open_positions = {}
         self.closed_positions = {}
         self.last_signal = datetime.now()
+        self.blocked_stocks = {}  # Stocks blocked for 7 days
+        
+        # Load blocked stocks from file
+        self.load_blocked_stocks()
         
         self.log("=" * 70)
         self.log("🥭 MANGO_BOT - COMPLETE TRADING SYSTEM")
-        self.log("📊 100 BEST STOCKS → 1 BEST signal per 30 min")
+        self.log("📊 100 BEST STOCKS → 1 BEST signal per 3 min")
         self.log("📈 Auto buy/sell + Daily analytics + Best stocks alert")
         self.log("⚡ Smart schedule: 8:30 AM - 4 PM, then sleep")
         self.log("=" * 70)
     
-    def log(self, msg):
-        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    def load_blocked_stocks(self):
+        """Load blocked stocks from file"""
+        try:
+            if os.path.exists('/home/claude/blocked_stocks.txt'):
+                with open('/home/claude/blocked_stocks.txt', 'r') as f:
+                    for line in f:
+                        symbol, timestamp_str = line.strip().split(',')
+                        self.blocked_stocks[symbol] = datetime.fromisoformat(timestamp_str)
+                self.log(f"   ✅ Loaded {len(self.blocked_stocks)} blocked stocks")
+        except:
+            pass
+    
+    def save_blocked_stocks(self):
+        """Save blocked stocks to file"""
+        try:
+            with open('/home/claude/blocked_stocks.txt', 'w') as f:
+                for symbol, timestamp in self.blocked_stocks.items():
+                    f.write(f"{symbol},{timestamp.isoformat()}\n")
+        except:
+            pass
+    
+    def is_stock_blocked(self, symbol):
+        """Check if stock is blocked (recommended in last 7 days)"""
+        if symbol not in self.blocked_stocks:
+            return False
+        
+        # Check if 7 days passed
+        blocked_time = self.blocked_stocks[symbol]
+        now = datetime.now()
+        days_passed = (now - blocked_time).days
+        
+        if days_passed >= 7:
+            # Unblock it
+            del self.blocked_stocks[symbol]
+            self.save_blocked_stocks()
+            return False
+        
+        return True
+    
+    def block_stock(self, symbol):
+        """Block stock for 7 days after sending signal"""
+        self.blocked_stocks[symbol] = datetime.now()
+        self.save_blocked_stocks()
+        from datetime import timezone, timedelta
+        ist = timezone(timedelta(hours=5, minutes=30))
+        ts = datetime.now(ist).strftime("%Y-%m-%d %H:%M:%S IST")
         print(f"[{ts}] {msg}")
     
     def get_stock_data(self, symbol):
@@ -279,7 +327,7 @@ class CompleteBot:
         
         embed = {
             "title": f"🟢 MANGO_BOT BUY: {symbol}",
-            "description": f"⏰ {datetime.now().strftime('%H:%M %Z')}",
+            "description": f"⏰ {datetime.now(timezone(timedelta(hours=5, minutes=30))).strftime('%H:%M IST')}",
             "color": 3066993,
             "thumbnail": {
                 "url": logo_url,
@@ -340,7 +388,9 @@ class CompleteBot:
         
         try:
             requests.post(self.webhook, json={'embeds': [embed]}, timeout=10)
-            self.log(f"📱 BUY SIGNAL: {symbol} @ ${price:.2f} → Target: ${target:.2f} (+{target_pct_display:.1f}%) | {signals_left} signals left")
+            # Block this stock for 7 days
+            self.block_stock(symbol)
+            self.log(f"📱 BUY SIGNAL: {symbol} @ ${price:.2f} → Target: ${target:.2f} (+{target_pct_display:.1f}%) | {signals_left} signals left | BLOCKED for 7 days")
         except:
             self.log("❌ Discord error")
     
@@ -616,24 +666,27 @@ class CompleteBot:
             self.log("❌ Discord error")
     
     def is_market_hours(self):
-        """Check if market is open (EDT) - 9:30 AM to 4:00 PM"""
-        from datetime import timezone
-        edt = timezone(timedelta(hours=-4))
-        now = datetime.now(edt)
+        """Check if US market is open (IST time) - 7:00 PM to 1:30 AM next day"""
+        from datetime import timezone, timedelta
+        ist = timezone(timedelta(hours=5, minutes=30))
+        now = datetime.now(ist)
         
+        # Market hours in IST: 7:00 PM (19:00) to 1:30 AM (01:30)
+        # Check if it's 7 PM or later, OR if it's before 1:30 AM
+        is_market_open = (now.hour >= 19) or (now.hour < 1) or (now.hour == 1 and now.minute < 30)
         is_weekday = now.weekday() < 5
-        is_open = 9.5 <= now.hour <= 16.0
         
-        return is_weekday and is_open
+        return is_weekday and is_market_open
     
     def is_pre_market(self):
-        """Check if it's 1 hour before market opens - 8:30 AM"""
-        from datetime import timezone
-        edt = timezone(timedelta(hours=-4))
-        now = datetime.now(edt)
+        """Check if it's 1 hour before market opens - 6:00 PM IST"""
+        from datetime import timezone, timedelta
+        ist = timezone(timedelta(hours=5, minutes=30))
+        now = datetime.now(ist)
         
+        # Pre-market: 6 PM to 7 PM IST
+        is_pre = (now.hour == 18 and now.minute >= 0)
         is_weekday = now.weekday() < 5
-        is_pre = 8.5 <= now.hour < 9.5
         
         return is_weekday and is_pre
     
@@ -666,8 +719,8 @@ class CompleteBot:
                 self.log(f"   📊 Open positions: {len(self.open_positions)}")
                 
                 elapsed = datetime.now() - self.last_signal
-                if elapsed >= timedelta(minutes=30):
-                    self.log("⏰ 30 min - SENDING NEW SIGNAL!")
+                if elapsed >= timedelta(minutes=3):
+                    self.log("⏰ 3 min - SENDING NEW SIGNAL!")
                     
                     if self.stocks_analysis:
                         best = max(self.stocks_analysis.items(), key=lambda x: x[1]['score'])
