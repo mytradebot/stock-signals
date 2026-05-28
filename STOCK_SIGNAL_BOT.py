@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+"""
+🥭 MANGO_BOT - FINAL COMPLETE VERSION
+30-min signals | 7-day block | Auto-sell | Daily analytics | IST timezone
+"""
 import os, time, json
 from datetime import datetime, timedelta, timezone
 import requests
@@ -28,13 +32,15 @@ class MangoBot:
         
         self.stocks_analysis = {}
         self.open_positions = {}
+        self.closed_positions = {}
         self.last_signal = datetime.now() - timedelta(minutes=31)
         self.blocked_stocks = {}
         self.load_blocked()
         
         self.log("=" * 70)
-        self.log("🥭 MANGO_BOT - FINAL VERSION")
-        self.log("📊 1 signal every 30 MIN | 7-day block | Auto-sell")
+        self.log("🥭 MANGO_BOT - FINAL COMPLETE VERSION")
+        self.log("📊 1 signal every 30 MIN | Auto-sell at target | 7-day block")
+        self.log("💰 Daily analytics | Stock logos | Why to buy | IST timezone")
         self.log("=" * 70)
     
     def log(self, msg):
@@ -43,38 +49,62 @@ class MangoBot:
         print(f"[{ts}] {msg}")
     
     def load_blocked(self):
+        """Load 7-day blocked stocks from file"""
         try:
-            if os.path.exists('/home/claude/blocked.json'):
-                with open('/home/claude/blocked.json', 'r') as f:
-                    data = json.load(f)
-                    for symbol, ts in data.items():
-                        self.blocked_stocks[symbol] = datetime.fromisoformat(ts)
-        except:
-            pass
+            paths = ['/home/claude/blocked.json', '/tmp/blocked.json', './blocked.json']
+            for path in paths:
+                if os.path.exists(path):
+                    with open(path, 'r') as f:
+                        data = json.load(f)
+                        for symbol, ts in data.items():
+                            self.blocked_stocks[symbol] = datetime.fromisoformat(ts)
+                    self.log(f"✅ Loaded blocked stocks from {path}")
+                    return
+        except Exception as e:
+            self.log(f"⚠️ Could not load blocked stocks: {e}")
     
     def save_blocked(self):
+        """Save 7-day blocked stocks to file"""
         try:
+            paths = ['/home/claude/blocked.json', '/tmp/blocked.json', './blocked.json']
             data = {s: ts.isoformat() for s, ts in self.blocked_stocks.items()}
-            with open('/home/claude/blocked.json', 'w') as f:
-                json.dump(data, f)
+            
+            for path in paths:
+                try:
+                    os.makedirs(os.path.dirname(path) if os.path.dirname(path) else '.', exist_ok=True)
+                    with open(path, 'w') as f:
+                        json.dump(data, f)
+                except:
+                    pass
         except:
             pass
     
     def is_blocked(self, symbol):
+        """Check if stock blocked (sent in last 7 days)"""
         if symbol not in self.blocked_stocks:
             return False
-        days = (datetime.now() - self.blocked_stocks[symbol]).days
+        
+        blocked_time = self.blocked_stocks[symbol]
+        days = (datetime.now() - blocked_time).days
+        hours = ((datetime.now() - blocked_time).total_seconds() / 3600)
+        
         if days >= 7:
+            self.log(f"✅ {symbol} unblocked (7 days passed)")
             del self.blocked_stocks[symbol]
             self.save_blocked()
             return False
+        
+        self.log(f"🔒 {symbol} blocked for {7-days} more days ({hours:.1f}h passed)")
         return True
     
     def block(self, symbol):
+        """Block stock for 7 days"""
         self.blocked_stocks[symbol] = datetime.now()
         self.save_blocked()
+        self.log(f"🔒 {symbol} BLOCKED for 7 days")
     
     def get_stock(self, symbol):
+        """Get stock data from Finnhub API"""
         try:
             url = f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={self.finnhub_key}"
             r = requests.get(url, timeout=5)
@@ -88,6 +118,7 @@ class MangoBot:
         return None
     
     def score_stock(self, symbol, data):
+        """Calculate stock quality score (0-100)"""
         if not data:
             return 0
         score = 0
@@ -107,27 +138,47 @@ class MangoBot:
                 score += 25
         return min(score, 100)
     
-    def scan(self):
-        self.log(f"🔍 Scanning {len(self.stocks)} stocks...")
-        found = 0
-        for symbol in self.stocks:
-            try:
-                data = self.get_stock(symbol)
-                if data:
-                    score = self.score_stock(symbol, data)
-                    self.stocks_analysis[symbol] = {'score': score, 'price': data['price'], 
-                                                     'volume': data['volume'], 'prev': data['prev']}
-                    found += 1
-                time.sleep(0.6)
-            except:
-                pass
-        self.log(f"✅ Analyzed {found}/{len(self.stocks)} stocks")
+    def get_logo(self, symbol):
+        """Get stock logo URL"""
+        try:
+            url = f"https://finnhub.io/api/v1/stock/profile2?symbol={symbol}&token={self.finnhub_key}"
+            r = requests.get(url, timeout=5)
+            data = r.json()
+            if 'logo' in data and data['logo']:
+                return data['logo']
+        except:
+            pass
+        return f"https://logo.clearbit.com/{symbol}.com"
+    
+    def why_buy(self, symbol, data, score):
+        """Generate short reason why to buy"""
+        reasons = []
+        
+        if data['prev'] > 0:
+            change = ((data['price'] - data['prev']) / data['prev']) * 100
+            if change > 0.5:
+                reasons.append(f"Momentum +{change:.2f}%")
+        
+        if data['volume'] > 10000000:
+            reasons.append("High liquidity")
+        elif data['volume'] > 5000000:
+            reasons.append("Strong volume")
+        
+        if 50 < data['price'] < 300:
+            reasons.append("Optimal price")
+        
+        if score >= 85:
+            reasons.append("Excellent signal")
+        elif score >= 75:
+            reasons.append("Strong setup")
+        
+        return reasons[0] if reasons else "Quality pick"
     
     def signals_left(self):
+        """Calculate signals left today"""
         ist = timezone(timedelta(hours=5, minutes=30))
         now = datetime.now(ist)
         
-        # Market: 7 PM to 1:30 AM
         if now.hour >= 19:
             mins = (24 - now.hour) * 60 - now.minute + 90
         elif now.hour < 1:
@@ -139,20 +190,27 @@ class MangoBot:
         
         return max(1, (mins // 30) + 1)
     
-    def is_open(self):
-        ist = timezone(timedelta(hours=5, minutes=30))
-        now = datetime.now(ist)
-        open_market = (now.hour >= 19) or (now.hour < 1) or (now.hour == 1 and now.minute < 30)
-        weekday = now.weekday() < 5
-        return weekday and open_market
-    
-    def is_market_close(self):
-        """Check if market just closed (1:30 AM - 1:35 AM)"""
-        ist = timezone(timedelta(hours=5, minutes=30))
-        now = datetime.now(ist)
-        return now.hour == 1 and 30 <= now.minute < 35
+    def scan(self):
+        """Scan all stocks from API"""
+        self.log(f"🔍 Scanning {len(self.stocks)} stocks...")
+        found = 0
+        for symbol in self.stocks:
+            try:
+                data = self.get_stock(symbol)
+                if data:
+                    score = self.score_stock(symbol, data)
+                    self.stocks_analysis[symbol] = {
+                        'score': score, 'price': data['price'], 
+                        'volume': data['volume'], 'prev': data['prev']
+                    }
+                    found += 1
+                time.sleep(0.6)
+            except:
+                pass
+        self.log(f"✅ Analyzed {found}/{len(self.stocks)} stocks")
     
     def monitor(self):
+        """Monitor open positions for exits"""
         now = datetime.now()
         to_close = []
         for symbol, pos in list(self.open_positions.items()):
@@ -178,9 +236,73 @@ class MangoBot:
         for s in to_close:
             del self.open_positions[s]
     
+    def sell(self, symbol, entry, exit_price, profit, reason):
+        """Send SELL signal to Discord"""
+        color = 3066993 if profit > 0 else 15158332
+        embed = {
+            "title": f"{reason} {symbol}",
+            "description": f"⏰ {datetime.now(timezone(timedelta(hours=5, minutes=30))).strftime('%H:%M IST')}",
+            "color": color,
+            "fields": [
+                {"name": "Entry", "value": f"${entry:.2f}", "inline": True},
+                {"name": "Exit", "value": f"${exit_price:.2f}", "inline": True},
+                {"name": "P&L", "value": f"{profit:+.2f}%", "inline": True}
+            ],
+            "footer": {"text": "🥭 Mango_Bot"}
+        }
+        try:
+            requests.post(self.webhook, json={'embeds': [embed]}, timeout=10)
+            self.log(f"📤 SELL: {symbol} | ${entry:.2f}→${exit_price:.2f} ({profit:+.2f}%)")
+            self.closed_positions[symbol] = {
+                'symbol': symbol, 'entry': entry, 'exit': exit_price, 'profit': profit
+            }
+        except:
+            pass
+    
+    def buy(self, symbol, data, score):
+        """Send BUY signal to Discord"""
+        price = data['price']
+        target = price * 1.035
+        left = self.signals_left()
+        logo = self.get_logo(symbol)
+        reason = self.why_buy(symbol, data, score)
+        
+        self.open_positions[symbol] = {
+            'entry': price, 'target': target, 'time': datetime.now()
+        }
+        self.block(symbol)
+        
+        embed = {
+            "title": f"🟢 MANGO_BOT BUY: {symbol}",
+            "description": f"⏰ {datetime.now(timezone(timedelta(hours=5, minutes=30))).strftime('%H:%M IST')}",
+            "color": 3066993,
+            "thumbnail": {
+                "url": logo,
+                "height": 100,
+                "width": 100
+            },
+            "fields": [
+                {"name": "📍 Entry", "value": f"${price:.2f}", "inline": True},
+                {"name": "🎯 Target", "value": f"${target:.2f} (+3.5%)", "inline": True},
+                {"name": "⭐ Score", "value": f"{score}/100", "inline": True},
+                {"name": "💡 Why to Buy", "value": reason, "inline": False},
+                {"name": "📢 Signals Left", "value": f"{left} more today! ⏰", "inline": True},
+                {"name": "💰 Auto Sell", "value": "At target!", "inline": True},
+                {"name": "🔒 Blocked", "value": "7 days (no repeat)", "inline": True}
+            ],
+            "footer": {"text": "🥭 Mango_Bot - Auto Signals & Auto Exits"}
+        }
+        
+        try:
+            requests.post(self.webhook, json={'embeds': [embed]}, timeout=10)
+            self.log(f"📱 BUY: {symbol} @ ${price:.2f} | Score: {score} | {left} signals left!")
+        except:
+            self.log("❌ Discord error")
+    
     def daily_analytics(self):
-        """Send daily analytics at 1:30 AM IST"""
+        """Send daily analytics at market close"""
         if not self.closed_positions:
+            self.log("📊 No trades today")
             return
         
         total = len(self.closed_positions)
@@ -215,103 +337,22 @@ class MangoBot:
         except:
             pass
     
-    def sell(self, symbol, entry, exit_price, profit, reason):
-        color = 3066993 if profit > 0 else 15158332
-        embed = {
-            "title": f"{reason} {symbol}",
-            "description": f"⏰ {datetime.now(timezone(timedelta(hours=5, minutes=30))).strftime('%H:%M IST')}",
-            "color": color,
-            "fields": [
-                {"name": "Entry", "value": f"${entry:.2f}", "inline": True},
-                {"name": "Exit", "value": f"${exit_price:.2f}", "inline": True},
-                {"name": "P&L", "value": f"{profit:+.2f}%", "inline": True}
-            ],
-            "footer": {"text": "🥭 Mango_Bot"}
-        }
-        try:
-            requests.post(self.webhook, json={'embeds': [embed]}, timeout=10)
-            self.log(f"📤 SELL: {symbol} | ${entry:.2f}→${exit_price:.2f} ({profit:+.2f}%)")
-            # Track closed position
-            self.closed_positions[symbol] = {'symbol': symbol, 'entry': entry, 'exit': exit_price, 'profit': profit}
-        except:
-            pass
+    def is_open(self):
+        """Check if market is open (7 PM - 1:30 AM IST)"""
+        ist = timezone(timedelta(hours=5, minutes=30))
+        now = datetime.now(ist)
+        open_market = (now.hour >= 19) or (now.hour < 1) or (now.hour == 1 and now.minute < 30)
+        weekday = now.weekday() < 5
+        return weekday and open_market
     
-    def get_logo(self, symbol):
-        """Get stock logo URL"""
-        try:
-            # Try Finnhub first
-            url = f"https://finnhub.io/api/v1/stock/profile2?symbol={symbol}&token={self.finnhub_key}"
-            r = requests.get(url, timeout=5)
-            data = r.json()
-            if 'logo' in data and data['logo']:
-                return data['logo']
-        except:
-            pass
-        
-        # Fallback to Clearbit
-        return f"https://logo.clearbit.com/{symbol}.com"
-    
-    def why_buy(self, symbol, data, score):
-        """Generate short reason why to buy"""
-        reasons = []
-        
-        if data['prev'] > 0:
-            change = ((data['price'] - data['prev']) / data['prev']) * 100
-            if change > 0.5:
-                reasons.append(f"Momentum +{change:.2f}%")
-        
-        if data['volume'] > 10000000:
-            reasons.append("High liquidity")
-        elif data['volume'] > 5000000:
-            reasons.append("Strong volume")
-        
-        if 50 < data['price'] < 300:
-            reasons.append("Optimal price")
-        
-        if score >= 85:
-            reasons.append("Excellent signal")
-        elif score >= 75:
-            reasons.append("Strong setup")
-        
-        return reasons[0] if reasons else "Quality pick"
-    
-    def buy(self, symbol, data, score):
-        price = data['price']
-        target = price * 1.035
-        left = self.signals_left()
-        logo = self.get_logo(symbol)
-        reason = self.why_buy(symbol, data, score)
-        
-        self.open_positions[symbol] = {'entry': price, 'target': target, 'time': datetime.now()}
-        self.block(symbol)
-        
-        embed = {
-            "title": f"🟢 MANGO_BOT BUY: {symbol}",
-            "description": f"⏰ {datetime.now(timezone(timedelta(hours=5, minutes=30))).strftime('%H:%M IST')}",
-            "color": 3066993,
-            "thumbnail": {
-                "url": logo,
-                "height": 100,
-                "width": 100
-            },
-            "fields": [
-                {"name": "📍 Entry", "value": f"${price:.2f}", "inline": True},
-                {"name": "🎯 Target", "value": f"${target:.2f} (+3.5%)", "inline": True},
-                {"name": "⭐ Score", "value": f"{score}/100", "inline": True},
-                {"name": "💡 Why to Buy", "value": reason, "inline": False},
-                {"name": "📢 Signals Left", "value": f"{left} more today! ⏰", "inline": True},
-                {"name": "💰 Auto Sell", "value": "At target!", "inline": True},
-                {"name": "🔒 Blocked", "value": "7 days (no repeat)", "inline": True}
-            ],
-            "footer": {"text": "🥭 Mango_Bot - Auto Signals & Auto Exits"}
-        }
-        try:
-            requests.post(self.webhook, json={'embeds': [embed]}, timeout=10)
-            self.log(f"📱 BUY: {symbol} @ ${price:.2f} | Score: {score} | {left} signals left!")
-        except:
-            self.log("❌ Discord error")
+    def is_market_close(self):
+        """Check if market just closed (1:30 AM - 1:35 AM)"""
+        ist = timezone(timedelta(hours=5, minutes=30))
+        now = datetime.now(ist)
+        return now.hour == 1 and 30 <= now.minute < 35
     
     def run(self):
+        """Main bot loop"""
         cycle = 0
         while True:
             try:
@@ -339,7 +380,7 @@ class MangoBot:
                 elif self.is_market_close():
                     self.log("🏁 MARKET CLOSED - SENDING DAILY ANALYTICS")
                     self.daily_analytics()
-                    self.closed_positions = {}  # Reset for next day
+                    self.closed_positions = {}
                 else:
                     self.log("😴 Market closed")
                 
