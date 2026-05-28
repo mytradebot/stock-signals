@@ -35,6 +35,7 @@ class MangoBot:
         self.closed_positions = {}
         self.last_signal = datetime.now() - timedelta(minutes=31)
         self.blocked_stocks = {}
+        self.last_analytics_sent = None  # Track when last analytics sent
         self.load_blocked()
         
         self.log("=" * 70)
@@ -303,6 +304,7 @@ class MangoBot:
         """Send daily analytics at market close"""
         if not self.closed_positions:
             self.log("📊 No trades today")
+            self.last_analytics_sent = datetime.now()
             return
         
         total = len(self.closed_positions)
@@ -333,9 +335,10 @@ class MangoBot:
         
         try:
             requests.post(self.webhook, json={'embeds': [embed]}, timeout=10)
-            self.log(f"📊 Daily Analytics: {total} trades, {win_rate:.1f}% win rate, {total_pnl:+.2f}% P&L")
+            self.log(f"📊 DAILY ANALYTICS: {total} trades, {win_rate:.1f}% win rate, {total_pnl:+.2f}% P&L ✅")
+            self.last_analytics_sent = datetime.now()
         except:
-            pass
+            self.log("❌ Failed to send analytics")
     
     def is_open(self):
         """Check if market is open (7 PM - 1:30 AM IST)"""
@@ -346,10 +349,20 @@ class MangoBot:
         return weekday and open_market
     
     def is_market_close(self):
-        """Check if market just closed (1:30 AM - 1:35 AM)"""
+        """Check if market closed (1:30 AM - 2:00 AM) and not sent yet today"""
         ist = timezone(timedelta(hours=5, minutes=30))
         now = datetime.now(ist)
-        return now.hour == 1 and 30 <= now.minute < 35
+        
+        # Analytics window: 1:30 AM - 2:00 AM
+        is_close_time = now.hour == 1 and now.minute >= 30
+        
+        # Check if already sent today
+        if self.last_analytics_sent:
+            time_since = now - self.last_analytics_sent
+            if time_since.days == 0:  # Same day
+                return False
+        
+        return is_close_time
     
     def run(self):
         """Main bot loop"""
