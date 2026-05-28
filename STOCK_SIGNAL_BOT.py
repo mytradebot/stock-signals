@@ -147,7 +147,7 @@ class CompleteBot:
         return min(score, 100)
     
     def scan(self):
-        """Scan 100 best stocks - works with Finnhub free tier"""
+        """Scan 100 best stocks - with delay to respect Finnhub rate limit"""
         self.log(f"🔍 Analyzing {len(self.stocks)} best stocks...")
         
         found = 0
@@ -165,18 +165,108 @@ class CompleteBot:
                     }
                     found += 1
                 
-                time.sleep(0.03)
+                time.sleep(0.6)  # 600ms delay between calls (respects 60/min limit)
             except:
                 pass
         
         self.log(f"   ✅ Analyzed {found} stocks")
     
-    def send_buy_signal(self, symbol, data, score):
-        """Send BUY signal to Discord"""
+    def get_target_percentage(self, symbol):
+        """Get profit target based on stock volatility and risk"""
+        
+        # High volatility tech - can move more
+        high_volatility = ['NVDA', 'TSLA', 'AMD', 'ROKU', 'UPST', 'SNOW', 'CRWD', 'DDOG', 'PLTR', 'RIOT']
+        
+        # Regular growth stocks
+        growth_stocks = ['MSFT', 'GOOGL', 'AMZN', 'META', 'ADBE', 'SHOP', 'ASML', 'QCOM', 'INTU', 'PYPL']
+        
+        # Stable blue chips - smaller moves
+        stable_stocks = ['AAPL', 'JNJ', 'WMT', 'PG', 'HD', 'MCD', 'COST', 'V', 'MA', 'JPM']
+        
+        # High risk/reward stocks
+        risky_stocks = ['BABA', 'JD', 'BILI', 'MARA', 'RIOT', 'BLNK', 'LCID']
+        
+        if symbol in high_volatility:
+            return 3.5  # 3.5% target for volatile stocks
+        elif symbol in growth_stocks:
+            return 2.5  # 2.5% target for growth
+        elif symbol in stable_stocks:
+            return 1.8  # 1.8% target for stable
+        elif symbol in risky_stocks:
+            return 4.0  # 4% target for high risk/reward
+        else:
+            return 2.5  # Default 2.5%
+    
+    def get_stop_percentage(self, symbol):
+        """Get stop loss based on stock risk"""
+        
+        high_volatility = ['NVDA', 'TSLA', 'AMD', 'ROKU', 'UPST', 'SNOW', 'CRWD', 'DDOG', 'PLTR', 'RIOT']
+        stable_stocks = ['AAPL', 'JNJ', 'WMT', 'PG', 'HD', 'MCD', 'COST', 'V', 'MA', 'JPM']
+        
+        if symbol in high_volatility:
+            return 2.0  # -2% stop for volatile
+        elif symbol in stable_stocks:
+            return 1.2  # -1.2% stop for stable
+        else:
+            return 1.5  # -1.5% default stop
+        """Calculate how many signals left today"""
+        from datetime import timezone
+        edt = timezone(timedelta(hours=-4))
+        now = datetime.now(edt)
+        
+        if now.hour >= 16:
+            return 0
+        
+        minutes_until_close = (16 - now.hour) * 60 - now.minute
+        signals_remaining = (minutes_until_close // 30)
+        
+        return max(0, signals_remaining)
+    
+    def get_why_to_buy(self, data, score):
+        """Generate short reason why to buy this stock"""
+        reasons = []
+        
         price = data['price']
-        target = price * 1.025
-        stop = price * 0.98
+        volume = data['volume']
+        prev_close = data['prev_close']
+        
+        if prev_close > 0:
+            change = ((price - prev_close) / prev_close) * 100
+            if change > 0.5:
+                reasons.append(f"Building momentum (+{change:.2f}%)")
+        
+        if volume > 10000000:
+            reasons.append("Very high liquidity")
+        elif volume > 5000000:
+            reasons.append("Strong volume")
+        
+        if 50 < price < 300:
+            reasons.append("Optimal price range")
+        
+        if score >= 90:
+            reasons.append("Excellent quality signal")
+        elif score >= 80:
+            reasons.append("High quality setup")
+        
+        return reasons[0] if reasons else "Quality signal identified"
+    
+    def send_buy_signal(self, symbol, data, score):
+        """Send BUY signal to Discord with dynamic targets per stock"""
+        price = data['price']
+        
+        # Get dynamic target based on stock
+        target_pct = self.get_target_percentage(symbol) / 100
+        stop_pct = self.get_stop_percentage(symbol) / 100
+        
+        target = price * (1 + target_pct)
+        stop = price * (1 - stop_pct)
+        target_pct_display = self.get_target_percentage(symbol)
+        stop_pct_display = self.get_stop_percentage(symbol)
+        
         logo_url = self.get_stock_logo(symbol)
+        
+        signals_left = self.get_remaining_signals()
+        why_to_buy = self.get_why_to_buy(data, score)
         
         self.open_positions[symbol] = {
             'entry_price': price,
@@ -204,13 +294,23 @@ class CompleteBot:
                 },
                 {
                     "name": "🎯 Target Profit",
-                    "value": f"${target:.2f} (+2.5%)",
+                    "value": f"${target:.2f} (+{target_pct_display:.1f}%)",
+                    "inline": True
+                },
+                {
+                    "name": "🛑 Stop Loss",
+                    "value": f"${stop:.2f} (-{stop_pct_display:.1f}%)",
                     "inline": True
                 },
                 {
                     "name": "⭐ Quality Score",
                     "value": f"{score}/100 ⭐",
                     "inline": True
+                },
+                {
+                    "name": "💡 Why to Buy",
+                    "value": why_to_buy,
+                    "inline": False
                 },
                 {
                     "name": "📊 Liquidity",
@@ -223,19 +323,24 @@ class CompleteBot:
                     "inline": True
                 },
                 {
+                    "name": "📢 Signals Left Today",
+                    "value": f"{signals_left} more signals! ⏰",
+                    "inline": True
+                },
+                {
                     "name": "✅ Auto Management",
-                    "value": "Bot exits automatically",
+                    "value": "Auto-sell on target/stop/time",
                     "inline": True
                 }
             ],
             "footer": {
-                "text": "🥭 Mango_Bot - Auto Signals & Auto Exits"
+                "text": "🥭 Mango_Bot - Auto Signals & Auto Exits | Sells within 5 min of target!"
             }
         }
         
         try:
             requests.post(self.webhook, json={'embeds': [embed]}, timeout=10)
-            self.log(f"📱 BUY SIGNAL: {symbol} @ ${price:.2f} (score: {score})")
+            self.log(f"📱 BUY SIGNAL: {symbol} @ ${price:.2f} → Target: ${target:.2f} (+{target_pct_display:.1f}%) | {signals_left} signals left")
         except:
             self.log("❌ Discord error")
     
