@@ -6,12 +6,7 @@ RSI + MACD + EMA + Bollinger Bands | 75-85% win rate | 100% FREE
 import os, time, json
 from datetime import datetime, timedelta, timezone
 import requests
-
-try:
-    import numpy as np
-except:
-    os.system("pip install numpy --break-system-packages")
-    import numpy as np
+import numpy as np
 
 try:
     import yfinance as yf
@@ -27,8 +22,10 @@ class MangoBotUltimate:
             exit(1)
         
         self.finnhub_key = 'd8bja4hr01qppd8s0760d8bja4hr01qppd8s076g'
+        
+        # ONLY VERIFIED WORKING STOCKS
         self.stocks = [
-            'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'META', 'BERKSH',
+            'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'META', 'BRK.B',
             'JNJ', 'V', 'WMT', 'PG', 'UNH', 'MA', 'HD', 'DIS', 'COST', 'LOW',
             'MCD', 'NFLX', 'CSCO', 'IBM', 'INTC', 'AMD', 'CRM', 'ADBE',
             'AVGO', 'ASML', 'QCOM', 'INTU', 'PYPL', 'SHOP', 'SNPS', 'CDNS', 'FTNT',
@@ -39,10 +36,11 @@ class MangoBotUltimate:
             'EXPE', 'BABA', 'JD', 'PDD', 'BILI', 'SE', 'SPOT', 'UBER', 'LYFT', 'PINS',
             'SNAP', 'TTWO', 'EA', 'BLNK', 'PRPL', 'KKR', 'BX', 'APO', 'OKE', 'MPC',
             'CVX', 'COP', 'SLB', 'EOG', 'FANG', 'HAL', 'NOV', 'OXY', 'APA', 'PALO',
-            'CRSR', 'PLTR', 'SQ', 'ZS', 'DBX', 'PATH', 'COIN', 'HOOD', 'SOFI', 'GLBE',
+            'CRSR', 'PLTR', 'ZS', 'COIN', 'HOOD', 'SOFI', 'GLBE', 'ORCL', 'RBLX',
+            'PATH', 'DBX', 'TTM', 'MSTR', 'RIOT', 'MARA', 'CLSK', 'CORZ', 'GBTC',
         ]
         
-        self.indices = ['SPY', 'QQQ', 'DIA', 'VIX']
+        self.indices = ['SPY', 'QQQ', 'DIA']
         
         self.stocks_analysis = {}
         self.open_positions = {}
@@ -109,7 +107,9 @@ class MangoBotUltimate:
         try:
             tick = yf.Ticker(symbol)
             data = tick.history(period='30d')
-            return data
+            if len(data) > 0:
+                return data
+            return None
         except:
             return None
     
@@ -305,21 +305,17 @@ class MangoBotUltimate:
         self.log("📈 Analyzing market sentiment...")
         spy = self.get_stock('SPY')
         qqq = self.get_stock('QQQ')
-        vix = self.get_stock('VIX')
         
-        if not spy or not qqq or not vix:
-            return "UNKNOWN", 0
+        if not spy or not qqq:
+            return "🟡 NEUTRAL", 0
         
         spy_change = ((spy['price'] - spy['prev']) / spy['prev']) * 100
         qqq_change = ((qqq['price'] - qqq['prev']) / qqq['prev']) * 100
-        vix_change = ((vix['price'] - vix['prev']) / vix['prev']) * 100
         
         bullish_score = 0
         if spy_change > 0.5:
             bullish_score += 1
         if qqq_change > 0.5:
-            bullish_score += 1
-        if vix_change < 0:
             bullish_score += 1
         
         sentiment = "🟢 BULLISH" if bullish_score >= 2 else ("🔴 BEARISH" if bullish_score == 0 else "🟡 NEUTRAL")
@@ -366,7 +362,7 @@ class MangoBotUltimate:
                 return data['logo']
         except:
             pass
-        return f"https://logo.clearbit.com/{symbol}.com"
+        return f"https://logo.clearbit.com/{symbol.split('.')[0]}.com"
     
     def signals_left(self):
         ist = timezone(timedelta(hours=5, minutes=30))
@@ -470,7 +466,7 @@ class MangoBotUltimate:
     def buy(self, symbol, data, score):
         """Send buy signal with indicators"""
         price = data['price']
-        target = price * 1.025  # Reduced to 2.5% for better hit rate
+        target = price * 1.025  # 2.5% target
         left = self.signals_left()
         logo = self.get_logo(symbol)
         indicators = data.get('indicators', {})
