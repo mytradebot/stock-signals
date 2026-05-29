@@ -6,8 +6,15 @@ RSI + MACD + EMA + Bollinger Bands | 75-85% win rate | 100% FREE
 import os, time, json
 from datetime import datetime, timedelta, timezone
 import requests
-import numpy as np
 
+# Auto-install numpy
+try:
+    import numpy as np
+except:
+    os.system("pip install numpy --break-system-packages")
+    import numpy as np
+
+# Auto-install yfinance
 try:
     import yfinance as yf
 except:
