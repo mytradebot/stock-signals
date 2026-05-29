@@ -13,24 +13,51 @@ class MangoBotUltimate:
     def __init__(self):
         self.webhook = os.environ.get('DISCORD_WEBHOOK')
         if not self.webhook:
-            print("❌ DISCORD_WEBHOOK not set!")
             exit(1)
         
         self.finnhub_key = 'd8bja4hr01qppd8s0760d8bja4hr01qppd8s076g'
         
         self.stocks = [
-            'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'META',
-            'JNJ', 'V', 'WMT', 'PG', 'UNH', 'MA', 'HD', 'DIS', 'COST', 'LOW',
-            'MCD', 'NFLX', 'CSCO', 'IBM', 'INTC', 'AMD', 'CRM', 'ADBE',
-            'AVGO', 'ASML', 'QCOM', 'INTU', 'PYPL', 'SHOP', 'SNPS', 'CDNS', 'FTNT',
-            'MU', 'KLAC', 'LRCX', 'AMAT', 'NKE', 'MRVL', 'MCHP', 'QRVO', 'SWKS',
-            'EXC', 'PAYX', 'DDOG', 'CRWD', 'ZM', 'OKTA', 'TWLO', 'NET', 'GDDY', 'WDAY',
-            'DOCN', 'SNOW', 'UPST', 'PTON', 'ROKU', 'NVAX', 'BIIB', 'REGN', 'VRTX', 'ALNY',
-            'ILMN', 'HUBS', 'DXCM', 'VEEV', 'ULTA', 'LULU', 'DASH', 'ABNB', 'TRIP', 'BKNG',
-            'EXPE', 'BABA', 'JD', 'PDD', 'BILI', 'SE', 'SPOT', 'UBER', 'LYFT', 'PINS',
-            'SNAP', 'TTWO', 'EA', 'BLNK', 'PRPL', 'KKR', 'BX', 'APO', 'OKE', 'MPC',
-            'CVX', 'COP', 'SLB', 'EOG', 'FANG', 'HAL', 'NOV', 'OXY', 'APA', 'PALO',
-            'CRSR', 'PLTR', 'ZS', 'COIN', 'HOOD', 'SOFI', 'GLBE', 'ORCL', 'RBLX',
+            'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'META', 'NFLX', 'ADOBE', 'INTC',
+            'AMD', 'CRM', 'ORCL', 'CSCO', 'IBM', 'INTU', 'PYPL', 'AVGO', 'QCOM', 'SNPS',
+            'CDNS', 'ASML', 'AMAT', 'LRCX', 'KLAC', 'MU', 'MRVL', 'MCHP', 'QRVO', 'FTNT',
+            'CRWD', 'OKTA', 'TWLO', 'NET', 'ZS', 'COIN', 'DDOG', 'SNOW', 'DOCN', 'PATH',
+            'HOOD', 'UPST', 'RBLX', 'DBX', 'SHOP', 'SPLK', 'PALO', 'CRSR', 'PLTR', 'SOFI',
+            'JNJ', 'UNH', 'PFE', 'MRK', 'ABBV', 'AMGN', 'CELG', 'BIIB', 'REGN', 'VRTX',
+            'ALNY', 'ILMN', 'VEEV', 'DXCM', 'ISRG', 'ALGN', 'EXAS', 'INCY', 'GILD', 'BPMC',
+            'NVAX', 'MRNA', 'BNTX', 'ARWR', 'SRPT', 'BBIO', 'BMRN', 'CBPO', 'EXEL', 'PCVX',
+            'SAGE', 'RGEN', 'VYGR', 'ADVM', 'AERI', 'APLT', 'AVRX', 'AXSM', 'AXTA', 'AZTA',
+            'BCRX', 'BGNE', 'BGLX', 'BIAH', 'BIEE', 'BKKT', 'BLSP', 'BLFS', 'BMCH', 'BMTX',
+            'JPM', 'BAC', 'WFC', 'GS', 'MS', 'BLK', 'BDX', 'SCHW', 'CME', 'ICE',
+            'V', 'MA', 'AXP', 'DFS', 'COF', 'RF', 'PNC', 'USB', 'TFC', 'KEY',
+            'CFG', 'MTB', 'FITB', 'HBAN', 'OZK', 'EWBC', 'UMBF', 'WAFD', 'BANR', 'CBSH',
+            'FCNCA', 'FFIN', 'FRME', 'GBCI', 'HOFT', 'HWBK', 'IBKR', 'ILHC', 'INDB', 'ISBC',
+            'KBSF', 'KFSB', 'LGBO', 'LHCG', 'MBNB', 'MOFB', 'NBHC', 'NWBI', 'NVRO', 'OFG',
+            'MCD', 'NKE', 'COST', 'LOW', 'HOME', 'DIS', 'BOOKING', 'EXPEDIA', 'UBER', 'LYFT',
+            'DASH', 'ABNB', 'TRIP', 'BKNG', 'EXPE', 'PINS', 'ULTA', 'LULU', 'DLTR', 'FIVE',
+            'ROST', 'RH', 'BBBY', 'JWN', 'M', 'KSS', 'GPS', 'GCG', 'DECK', 'YUM',
+            'LVS', 'WYNN', 'PENN', 'CAR', 'KMX', 'AZO', 'ORLY', 'AAP', 'CCL', 'RCL',
+            'DAL', 'UAL', 'ALK', 'JBLU', 'SAVE', 'SKX', 'WMT', 'PG', 'KO', 'PEP',
+            'CL', 'KMB', 'CRK', 'MO', 'PM', 'UVV', 'GIS', 'K', 'CAG', 'MNST',
+            'TAP', 'STZ', 'BF.B', 'HSY', 'CPB', 'ADM', 'CELH', 'EL', 'CLX', 'FMX',
+            'FIZZ', 'GNRC', 'HRL', 'JJSF', 'LECO', 'LW', 'MDLZ', 'OCHF', 'SMPL', 'SNYD',
+            'SJM', 'TSN', 'UNFI', 'WDC', 'WSFS', 'WBA',
+            'GE', 'BA', 'RTX', 'HON', 'LMT', 'NOC', 'GD', 'TDG', 'ITT', 'SPR',
+            'APH', 'HUBB', 'ALLE', 'EMR', 'IR', 'ZTS', 'SWK', 'TMDX', 'XEL', 'NEE',
+            'DUK', 'SO', 'EXC', 'D', 'PEG', 'SRE', 'WEC', 'PPL', 'AEP', 'AES',
+            'CMS', 'DTE', 'EIX', 'EQT', 'FE', 'NI', 'OKE', 'AVA', 'PNW', 'CNP',
+            'EVRG', 'LNT', 'MAS', 'XOM', 'CVX', 'COP', 'MPC', 'PSX', 'VLO', 'FANG',
+            'EOG', 'SLB', 'HAL', 'OXY', 'NOV', 'APA', 'CIVI', 'DINO', 'DVN', 'EQNR',
+            'GPRK', 'KMI', 'LPI', 'MRO', 'CTRA', 'PBA', 'PEN', 'PXD', 'RRC', 'SD',
+            'SM', 'SNAP', 'TC', 'TSP', 'WMB', 'WPZ', 'NEM', 'GOLD', 'GFI', 'PAAS',
+            'ALTG', 'AU', 'AUY', 'BAR', 'HL', 'IAG', 'KL', 'MAG', 'SA', 'SSR',
+            'CCI', 'EQIX', 'DLR', 'CSGP', 'PLD', 'AMT', 'SBAC', 'SBA', 'AVB', 'PSA',
+            'EXR', 'WELL', 'KRC', 'UMH', 'MPW', 'STAG', 'WCC', 'NHI', 'NHS', 'OHI',
+            'PAGP', 'EPR', 'STORE', 'WRT', 'IRT', 'KIM', 'REG', 'SKT', 'BRG', 'CDR',
+            'CHCT', 'CTO', 'DEI', 'DRH', 'EDR', 'ELME', 'ELS', 'EME', 'EPRT', 'ESRT',
+            'FAM', 'FBP', 'FPI', 'FRT', 'GDRX', 'CMCSA', 'CHTR', 'TMUS', 'VZ', 'T',
+            'DISH', 'FOX', 'FOXA', 'VIACA', 'LBRDK', 'LBRDA', 'MSGS', 'MSGM', 'ROKU', 'SPOT',
+            'TWTR', 'MTCH', 'ZG', 'ZASH', 'ZETA', 'VIAC', 'FUBO', 'VUZI', 'TRNX', 'TXRH', 'TWOU',
         ]
         
         self.stocks_analysis = {}
@@ -41,10 +68,7 @@ class MangoBotUltimate:
         self.premarket_sent = False
         
         self.load_blocked()
-        self.log("=" * 60)
-        self.log("🥭 MANGO_BOT ULTIMATE - 4 INDICATORS")
-        self.log("Finnhub API | Every 5 min scan | Every 30 min signal")
-        self.log("=" * 60)
+        self.log("🥭 MANGO_BOT ULTIMATE STARTED")
     
     def log(self, msg):
         ist = timezone(timedelta(hours=5, minutes=30))
@@ -77,7 +101,6 @@ class MangoBotUltimate:
             pass
     
     def get_stock(self, symbol):
-        """Get stock data from Finnhub"""
         try:
             url = f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={self.finnhub_key}"
             r = requests.get(url, timeout=5)
@@ -85,90 +108,58 @@ class MangoBotUltimate:
             if 'c' in d and d['c'] > 0:
                 return {
                     'price': float(d['c']), 
-                    'volume': int(d.get('v', 0)), 
+                    'volume': int(d.get('v', 100000)), 
                     'high': float(d.get('h', d['c'])), 
                     'low': float(d.get('l', d['c'])), 
                     'prev': float(d.get('pc', d['c']))
                 }
         except:
             pass
+        
+        try:
+            url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={symbol}&apikey=demo"
+            r = requests.get(url, timeout=5)
+            d = r.json()
+            if 'Global Quote' in d and d['Global Quote'].get('05. price'):
+                quote = d['Global Quote']
+                price = float(quote['05. price'])
+                if price > 0:
+                    return {
+                        'price': price,
+                        'volume': int(quote.get('06. volume', 100000)),
+                        'high': float(quote.get('03. high', price)),
+                        'low': float(quote.get('04. low', price)),
+                        'prev': float(quote.get('08. previous close', price))
+                    }
+        except:
+            pass
+        
         return None
     
     def score_stock(self, symbol, data):
-        """Score stock based on current data"""
-        if not data or data['price'] <= 0 or data['volume'] <= 0:
+        if not data or data['price'] <= 0:
             return 0
         
         score = 0
         
-        # Volume (0-30)
-        if data['volume'] > 10000000:
+        if data['volume'] > 5000000:
             score += 30
-        elif data['volume'] > 5000000:
-            score += 25
         elif data['volume'] > 1000000:
             score += 20
+        else:
+            score += 10
         
-        # Price range (0-30)
-        if 50 < data['price'] < 300:
+        if 50 < data['price'] < 500:
             score += 30
-        elif 20 < data['price'] <= 50 or 300 <= data['price'] < 500:
-            score += 20
+        elif data['price'] > 0:
+            score += 15
         
-        # Momentum (0-20)
         if data['prev'] > 0:
             change = ((data['price'] - data['prev']) / data['prev']) * 100
-            if 0.5 <= change <= 3:
-                score += 20
-            elif 0 <= change < 0.5:
-                score += 10
-        
-        # High/Low range (0-20)
-        if data['high'] > data['low']:
-            range_pct = ((data['high'] - data['low']) / data['low']) * 100
-            if 0.5 <= range_pct <= 5:
-                score += 20
-            elif range_pct > 0:
-                score += 10
+            if -1 <= change <= 5:
+                score += 40
         
         return min(max(score, 0), 100)
-    
-    def get_logo(self, symbol):
-        try:
-            url = f"https://finnhub.io/api/v1/stock/profile2?symbol={symbol}&token={self.finnhub_key}"
-            r = requests.get(url, timeout=5)
-            data = r.json()
-            if 'logo' in data and data['logo']:
-                return data['logo']
-        except:
-            pass
-        return None
-    
-    def get_market_news(self):
-        try:
-            url = f"https://finnhub.io/api/v1/news?category=general&token={self.finnhub_key}"
-            r = requests.get(url, timeout=5)
-            data = r.json()
-            if data and len(data) > 0:
-                news = data[0]
-                return {
-                    'headline': news.get('headline', 'Market Update'),
-                    'source': news.get('source', 'News')
-                }
-        except:
-            pass
-        return None
-    
-    def signals_left(self):
-        ist = timezone(timedelta(hours=5, minutes=30))
-        now = datetime.now(ist)
-        if now.hour >= 19:
-            mins = (24 - now.hour) * 60 - now.minute + 90
-        elif now.hour < 1:
-            mins = (1 - now.hour) * 60 - now.minute + 30
-        else:
-            return 0
-        return max(1, (mins // 30) + 1)
     
     def premarket_check(self):
         ist = timezone(timedelta(hours=5, minutes=30))
@@ -179,27 +170,26 @@ class MangoBotUltimate:
         
         spy = self.get_stock('SPY')
         qqq = self.get_stock('QQQ')
-        news = self.get_market_news()
         
         if spy and qqq:
             spy_change = ((spy['price'] - spy['prev']) / spy['prev']) * 100 if spy['prev'] > 0 else 0
             qqq_change = ((qqq['price'] - qqq['prev']) / qqq['prev']) * 100 if qqq['prev'] > 0 else 0
-            sentiment = "🟢 BULLISH" if (spy_change + qqq_change) / 2 > 0.5 else "🟡 NEUTRAL"
+            
+            sentiment = "🟢 BULLISH" if (spy_change + qqq_change) / 2 > 0.5 else ("🔴 BEARISH" if (spy_change + qqq_change) / 2 < -0.5 else "🟡 NEUTRAL")
             
             fields = [
-                {"name": "📊 Sentiment", "value": sentiment, "inline": True},
-                {"name": "SPY", "value": f"{spy_change:+.2f}%", "inline": True},
-                {"name": "QQQ", "value": f"{qqq_change:+.2f}%", "inline": True},
+                {"name": "📊 Market Sentiment", "value": sentiment, "inline": True},
+                {"name": "📈 S&P 500 (SPY)", "value": f"{spy_change:+.2f}%", "inline": True},
+                {"name": "💻 Nasdaq (QQQ)", "value": f"{qqq_change:+.2f}%", "inline": True},
+                {"name": "💡 Today's Action", "value": "Markets are ready! Quality signals incoming.", "inline": False},
+                {"name": "⚠️ Strategy", "value": "Cautious - Only take high-quality signals (70+).", "inline": False}
             ]
             
-            if news:
-                fields.append({"name": "📰 News", "value": f"{news['headline'][:80]}...", "inline": False})
-            
             embed = {
-                "title": "🌅 PRE-MARKET ANALYSIS",
+                "title": "🌅 MANGO_BOT - MARKET MOMENTUM",
                 "color": 16776960,
                 "fields": fields,
-                "footer": {"text": "🥭 Mango_Bot"}
+                "footer": {"text": "🥭 Mango_Bot - Market Outlook | Happy Trading!"}
             }
             try:
                 requests.post(self.webhook, json={'embeds': [embed]}, timeout=10)
@@ -215,10 +205,9 @@ class MangoBotUltimate:
         for symbol in self.stocks:
             try:
                 data = self.get_stock(symbol)
-                if data and data['price'] > 0 and data['volume'] > 0:
+                if data and data['price'] > 0:
                     score = self.score_stock(symbol, data)
-                    
-                    if score > 20:
+                    if score >= 50:
                         self.stocks_analysis[symbol] = {
                             'score': score, 
                             'price': data['price'], 
@@ -228,7 +217,7 @@ class MangoBotUltimate:
                             'low': data['low']
                         }
                         found += 1
-                time.sleep(0.25)
+                time.sleep(0.2)
             except:
                 pass
         
@@ -246,13 +235,26 @@ class MangoBotUltimate:
                 entry = pos['entry']
                 target = pos['target']
                 
-                if price >= target:
+                if price >= target or (now - pos['time']).days >= 7:
                     profit = ((price - entry) / entry) * 100
-                    self.sell(symbol, entry, price, profit, "🎉 TARGET")
-                    to_close.append(symbol)
-                elif (now - pos['time']).days >= 7:
-                    profit = ((price - entry) / entry) * 100
-                    self.sell(symbol, entry, price, profit, "⏰ 7-DAY")
+                    reason = "🎉 TARGET HIT" if price >= target else "⏰ 7-DAY EXIT"
+                    
+                    embed = {
+                        "title": f"{reason} {symbol}",
+                        "color": 3066993 if profit > 0 else 15158332,
+                        "fields": [
+                            {"name": "Entry", "value": f"${entry:.2f}", "inline": True},
+                            {"name": "Exit", "value": f"${price:.2f}", "inline": True},
+                            {"name": "P&L", "value": f"{profit:+.2f}%", "inline": True}
+                        ],
+                        "footer": {"text": "🥭 Mango_Bot"}
+                    }
+                    try:
+                        requests.post(self.webhook, json={'embeds': [embed]}, timeout=10)
+                        self.closed_positions[symbol] = {'symbol': symbol, 'profit': profit}
+                        self.log(f"📤 SELL: {symbol} ({profit:+.2f}%)")
+                    except:
+                        pass
                     to_close.append(symbol)
             except:
                 pass
@@ -260,60 +262,35 @@ class MangoBotUltimate:
             if s in self.open_positions:
                 del self.open_positions[s]
     
-    def sell(self, symbol, entry, exit_price, profit, reason):
-        color = 3066993 if profit > 0 else 15158332
-        embed = {
-            "title": f"{reason} {symbol}",
-            "color": color,
-            "fields": [
-                {"name": "Entry", "value": f"${entry:.2f}", "inline": True},
-                {"name": "Exit", "value": f"${exit_price:.2f}", "inline": True},
-                {"name": "P&L", "value": f"{profit:+.2f}%", "inline": True}
-            ],
-            "footer": {"text": "🥭 Mango_Bot"}
-        }
-        try:
-            requests.post(self.webhook, json={'embeds': [embed]}, timeout=10)
-            self.closed_positions[symbol] = {'symbol': symbol, 'profit': profit}
-            self.log(f"📤 SELL: {symbol} ({profit:+.2f}%)")
-        except:
-            pass
-    
     def buy(self, symbol, data, score):
         price = data['price']
         target = price * 1.025
-        logo = self.get_logo(symbol)
-        left = self.signals_left()
         
         self.open_positions[symbol] = {'entry': price, 'target': target, 'time': datetime.now()}
         self.blocked_stocks[symbol] = datetime.now()
         self.save_blocked()
         
-        # Why to buy
-        change = ((price - data['prev']) / data['prev'] * 100) if data['prev'] > 0 else 0
-        why_text = "Momentum bullish" if change > 0.5 else "Volume strong"
-        
-        fields = [
-            {"name": "📍 Entry", "value": f"${price:.2f}", "inline": True},
-            {"name": "🎯 Target", "value": f"${target:.2f} (+2.5%)", "inline": True},
-            {"name": "⭐ Score", "value": f"{score}/100", "inline": True},
-            {"name": "📢 Signals Left", "value": f"{left} today! ⏰", "inline": True},
-            {"name": "📊 Why", "value": why_text, "inline": False},
-        ]
+        ist = timezone(timedelta(hours=5, minutes=30))
+        now = datetime.now(ist)
+        mins_left = ((24 - now.hour) * 60 - now.minute + 90) if now.hour >= 19 else ((1 - now.hour) * 60 - now.minute + 30)
+        signals_left = max(1, (mins_left // 30) + 1)
         
         embed = {
-            "title": f"🟢 BUY: {symbol}",
+            "title": f"🟢 MANGO_BOT BUY: {symbol}",
             "color": 3066993,
-            "fields": fields,
-            "footer": {"text": "🥭 Mango_Bot"}
+            "fields": [
+                {"name": "📍 Entry", "value": f"${price:.2f}", "inline": True},
+                {"name": "🎯 Target", "value": f"${target:.2f} (+2.5%)", "inline": True},
+                {"name": "⭐ Score", "value": f"{score}/100", "inline": True},
+                {"name": "📢 Signals Left", "value": f"{signals_left} more today!", "inline": True},
+                {"name": "🔒 Locked", "value": "7 days", "inline": True},
+            ],
+            "footer": {"text": "🥭 Mango_Bot Pro"}
         }
-        
-        if logo:
-            embed["thumbnail"] = {"url": logo}
         
         try:
             requests.post(self.webhook, json={'embeds': [embed]}, timeout=10)
-            self.log(f"📱 BUY: {symbol} @ ${price:.2f} | Score: {score}")
+            self.log(f"📱 BUY: {symbol} @ ${price:.2f}")
         except:
             pass
     
@@ -335,9 +312,7 @@ class MangoBotUltimate:
     def is_open(self):
         ist = timezone(timedelta(hours=5, minutes=30))
         now = datetime.now(ist)
-        open_market = (now.hour >= 19) or (now.hour < 1) or (now.hour == 1 and now.minute < 30)
-        weekday = now.weekday() < 5
-        return weekday and open_market
+        return ((now.hour >= 19) or (now.hour < 1) or (now.hour == 1 and now.minute < 30)) and now.weekday() < 5
     
     def is_market_close(self):
         ist = timezone(timedelta(hours=5, minutes=30))
@@ -360,7 +335,7 @@ class MangoBotUltimate:
                     self.monitor()
                     
                     elapsed = datetime.now() - self.last_signal
-                    if elapsed >= timedelta(minutes=30):
+                    if elapsed >= timedelta(minutes=30) and len(self.stocks_analysis) > 0:
                         available = {s: d for s, d in self.stocks_analysis.items() if not self.is_blocked(s)}
                         if available:
                             best = max(available.items(), key=lambda x: x[1]['score'])
