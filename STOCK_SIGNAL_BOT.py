@@ -577,7 +577,7 @@ class MangoBot:
                 logo, name = self.get_logo(symbol)
                 results[symbol] = {'quote': q, 'info': info, 'logo': logo, 'name': name}
 
-                if info['score'] >= 60:
+                if info['score'] >= 30:
                     self.log(f"  ✅ {symbol:6s} {info['score']:3d}/100  "
                              f"RSI={info['rsi']}  MACD={info['macd_hist']:.3f}  "
                              f"BB={info['bb_pct']:.2f}  sup={info['sup_dist_pct']:.1f}%")
