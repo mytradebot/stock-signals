@@ -1,5 +1,3 @@
-$ cat /home/user/stock-signals/STOCK_SIGNAL_BOT.py
-
 #!/usr/bin/env python3
 """
 MangoBotUltimate v4.0
