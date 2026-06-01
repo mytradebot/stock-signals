@@ -306,58 +306,48 @@ def volume_spike(volumes, lookback=10):
 # ─────────────────────────────────────────────
 # SCORING  (0–100, dip-buy focused)
 # ─────────────────────────────────────────────
-def score_stock(quote, candles):
-    closes, lows, volumes = candles['close'], candles['low'], candles['volume']
-    price, prev = quote['price'], quote['prev']
-    pts, info = 0, {}
-
-    # RSI — 25 pts
-    r = rsi(closes)
-    info['rsi'] = round(r, 1)
-    if 32 <= r <= 50:    pts += 25
-    elif 50 < r <= 58:   pts += 18
-    elif r < 32:         pts += 10
-    elif 58 < r <= 65:   pts += 8
-
-    # MACD histogram — 20 pts
-    hist, ml = macd(closes)
-    info['macd_hist'] = round(hist, 4)
-    if hist > 0 and hist > abs(ml) * 0.05:  pts += 20
-    elif hist > 0:                           pts += 13
-    elif -0.3 < hist <= 0:                  pts += 5
-
-    # Bollinger position — 20 pts
-    bb_u, bb_m, bb_l = bollinger(closes)
-    bb_pct = (price - bb_l) / (bb_u - bb_l + 1e-9)
-    info['bb_pct'] = round(bb_pct, 2)
-    if bb_pct <= 0.35:    pts += 20
-    elif bb_pct <= 0.50:  pts += 15
-    elif bb_pct <= 0.65:  pts += 8
-
-    # Support distance — 15 pts
-    sup = support_distance(price, lows, lookback=min(15, len(lows)))
-    info['sup_dist_pct'] = round(sup, 2)
-    if sup <= 3.0:    pts += 15
-    elif sup <= 6.0:  pts += 10
-    elif sup <= 10.0: pts += 5
-
-    # Trend slope — 10 pts
-    slope = trend_slope(closes, lookback=min(15, len(closes)))
-    info['trend_slope'] = round(slope, 3)
-    if 0.1 <= slope <= 1.0:    pts += 10
-    elif -0.2 <= slope < 0.1:  pts += 7
-    elif slope > 1.0:          pts += 5
-
-    # Volume spike — 10 pts
-    vs = volume_spike(volumes)
-    info['vol_spike'] = round(vs, 2)
-    if vs >= 1.8:    pts += 10
-    elif vs >= 1.3:  pts += 6
-    elif vs >= 1.0:  pts += 3
-
-    # Day change penalty
-    chg = (price - prev) / prev * 100 if prev > 0 else 0
-    info['chg_pct'] = round(chg, 2)
+def score_stock(quote):
+    """Score based on current price data only - NO HISTORICAL DATA"""
+    pts = 0
+    info = {}
+    
+    price = quote.get('price', 0)
+    prev = quote.get('prev', price)
+    volume = quote.get('volume', 0)
+    
+    if price <= 0 or prev <= 0:
+        return 0, {}
+    
+    # Momentum (0-40)
+    chg = (price - prev) / prev * 100
+    info['momentum'] = round(chg, 2)
+    if -1 <= chg <= 3:
+        pts += 40
+    elif -2 <= chg < -1 or 3 < chg <= 5:
+        pts += 25
+    elif chg < -2 or chg > 5:
+        pts += 10
+    
+    # Volume (0-35)
+    info['volume'] = round(volume / 1e6, 1)
+    if volume > 10e6:
+        pts += 35
+    elif volume > 5e6:
+        pts += 28
+    elif volume > 1e6:
+        pts += 18
+    elif volume > 0:
+        pts += 8
+    
+    # Price (0-25)
+    if 50 < price < 500:
+        pts += 25
+    elif 20 < price <= 50 or 500 <= price < 1000:
+        pts += 15
+    elif price > 0:
+        pts += 8
+    
+    return min(pts, 100), info
     if chg < -4.0 or chg > 5.0:
         pts = max(0, pts - 20)
 
@@ -569,18 +559,15 @@ class MangoBot:
                 if not q or q['price'] <= 0:
                     time.sleep(0.1); continue
 
-                c = self.mkt.candles(symbol)
-                if c is None:
+                score, info = score_stock(q)
+                if score == 0:
                     time.sleep(0.1); continue
-
-                info = score_stock(q, c)
+                    
                 logo, name = self.get_logo(symbol)
-                results[symbol] = {'quote': q, 'info': info, 'logo': logo, 'name': name}
+                results[symbol] = {'quote': q, 'info': {'score': score, **info}, 'logo': logo, 'name': name}
 
-                if info['score'] >= 30:
-                    self.log(f"  ✅ {symbol:6s} {info['score']:3d}/100  "
-                             f"RSI={info['rsi']}  MACD={info['macd_hist']:.3f}  "
-                             f"BB={info['bb_pct']:.2f}  sup={info['sup_dist_pct']:.1f}%")
+                if score >= 30:
+                    self.log(f"  ✅ {symbol:6s} {score:3d}/100  Momentum={info.get('momentum', 0)}%  Vol={info.get('volume', 0)}M")
                 time.sleep(0.1)
 
             except Exception as e:
